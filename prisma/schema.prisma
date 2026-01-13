@@ -1,0 +1,160 @@
+// backend/prisma/schema.prisma - SCHEMA COMPLETO
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// USUARIO
+// ========================================
+model User {
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  senha     String
+  telefone  String?
+  tipo      String   @default("passageiro")
+  cnhFrenteUri String?
+  cnhVersoUri  String?
+  cnhStatus    String?  @default("pendente")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  // Relacoes
+  corridas     Corrida[]
+  favoritos    Favorito[]
+  cartoes      Cartao[]
+  carteira     Carteira?
+  transacoes   Transacao[]
+  carros       Carro[]
+}
+
+// ========================================
+// CORRIDA
+// ========================================
+model Corrida {
+  id               String   @id @default(uuid())
+  passageiroId     String
+  motoristaId      String?
+  origemLat        Float
+  origemLng        Float
+  origemEndereco   String
+  destinoLat       Float
+  destinoLng       Float
+  destinoEndereco  String
+  distancia        Float
+  preco            Float
+  status           String   @default("aguardando") // aguardando, aceita, em_andamento, finalizada, cancelada, paga
+  metodoPagamento  String?  // cartao, carteira, dinheiro
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relacoes
+  passageiro User @relation(fields: [passageiroId], references: [id], onDelete: Cascade)
+}
+
+// ========================================
+// FAVORITOS
+// ========================================
+model Favorito {
+  id        String   @id @default(uuid())
+  userId    String
+  nome      String
+  endereco  String
+  latitude  Float
+  longitude Float
+  icone     String   @default("star")
+  createdAt DateTime @default(now())
+
+  // Relacoes
+  usuario User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ========================================
+// CARTAO
+// ========================================
+model Cartao {
+  id         String   @id @default(uuid())
+  userId     String
+  numero     String   // Mascarado: **** **** **** 1234
+  nome       String
+  validade   String
+  bandeira   String   // Visa, Mastercard, etc
+  principal  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  
+  usuario    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ========================================
+// CARTEIRA
+// ========================================
+model Carteira {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  saldo     Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  usuario   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ========================================
+// TRANSACAO
+// ========================================
+model Transacao {
+  id            String   @id @default(uuid())
+  userId        String
+  tipo          String   // credito ou debito
+  valor         Float
+  descricao     String
+  saldoAnterior Float
+  saldoNovo     Float
+  createdAt     DateTime @default(now())
+  
+  usuario       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ========================================
+// CARRO (Motorista)
+// ========================================
+model Carro {
+  id         String   @id @default(uuid())
+  userId     String
+  marca      String
+  modelo     String
+  placa      String
+  cor        String?
+  ano        Int?
+  seguro     String?
+  inspecao   String?
+  licenciamento String?
+  docSeguroUri String?
+  docInspecaoUri String?
+  docLicenciamentoUri String?
+  principal  Boolean  @default(false)
+  ativo      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  usuario    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ========================================
+// ALERTA ADMIN (mudancas veiculares)
+// ========================================
+model AlertaAdmin {
+  id          String   @id @default(uuid())
+  tipo        String   // ex: 'veiculo'
+  acao        String   // adicionar, editar, remover, definir_principal
+  motoristaId String
+  carroId     String?
+  dados       String?
+  criadoEm    DateTime @default(now())
+}
+
