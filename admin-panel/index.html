@@ -342,6 +342,7 @@
     const motoristas = new Map();
     let corridas = [];
     let transacoes = [];
+    let lastMotoristaPos = null;
     let refreshTimer = null;
     let corridasReloadTimer = null;
 
@@ -449,7 +450,10 @@
                     <h2 style="margin:0;">Mapa em tempo real</h2>
                     <div class="muted" id="socketStatus">Socket: desconectado</div>
                   </div>
-                  <button class="btn" onclick="fitMapToMarkers()">Ajustar mapa</button>
+                  <div class="row">
+                    <button class="btn-ghost" onclick="centerMap()">Centralizar</button>
+                    <button class="btn" onclick="fitMapToMarkers()">Ajustar mapa</button>
+                  </div>
                 </div>
                 <div id="map"></div>
                 <div class="map-legend">
@@ -571,9 +575,19 @@
       }
     }
 
+    function centerMap() {
+      if (!map) return;
+      if (lastMotoristaPos) {
+        map.setView(lastMotoristaPos, 13, { animate: true });
+        return;
+      }
+      map.setView([-23.5505, -46.6333], 11, { animate: true });
+    }
+
     function upsertMarker(motorista) {
       if (!map || !motorista.localizacao) return;
       const { latitude, longitude } = motorista.localizacao;
+      lastMotoristaPos = [latitude, longitude];
       const status = motorista.statusOnline || 'offline';
       const id = motorista.id;
       const existing = markers.get(id);
