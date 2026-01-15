@@ -361,6 +361,12 @@
       const num = Number(value || 0);
       return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
     };
+    const truncateText = (value, max = 40) => {
+      if (!value) return '-';
+      const text = `${value}`;
+      if (text.length <= max) return text;
+      return `${text.slice(0, max - 1)}…`;
+    };
 
     const statusBadgeClass = (status) => {
       if (status === 'aceita' || status === 'finalizada' || status === 'paga') return 'status-ok';
@@ -507,13 +513,14 @@
                       <th>Motorista</th>
                       <th>Status</th>
                       <th>Avaliacao</th>
+                      <th>Comentario</th>
                       <th>Valor</th>
                       <th>Origem</th>
                       <th>Destino</th>
                     </tr>
                   </thead>
                   <tbody id="corridasBody">
-                    <tr><td colspan="8">Carregando...</td></tr>
+                    <tr><td colspan="9">Carregando...</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -742,11 +749,13 @@
             <tr>
               <td>${formatDate(c.createdAt)}</td>
               <td>${c.status || '-'}</td>
+              <td>${c.avaliacao ? `${c.avaliacao}★` : '-'}</td>
+              <td title="${c.comentarioAvaliacao ? c.comentarioAvaliacao.replace(/"/g, '&quot;') : ''}">${truncateText(c.comentarioAvaliacao)}</td>
               <td>${formatMoney(c.preco)}</td>
               <td>${c.metodoPagamento || '-'}</td>
             </tr>
           `).join('')
-        : '<tr><td colspan="4">Nenhuma corrida encontrada</td></tr>';
+        : '<tr><td colspan="6">Nenhuma corrida encontrada</td></tr>';
 
       modalContent.innerHTML = `
         <div class="modal-header">
@@ -818,6 +827,8 @@
               <tr>
                 <th>Data</th>
                 <th>Status</th>
+                <th>Avaliacao</th>
+                <th>Comentario</th>
                 <th>Valor</th>
                 <th>Pagamento</th>
               </tr>
@@ -897,6 +908,8 @@
         const destino = c.destinoEndereco || '-';
         const status = c.status || '-';
         const avaliacao = c.avaliacao ? `${c.avaliacao}★` : '-';
+        const comentario = c.comentarioAvaliacao || '';
+        const comentarioShort = truncateText(comentario);
         return `
           <tr>
             <td>${formatDate(c.createdAt)}</td>
@@ -904,13 +917,14 @@
             <td>${motorista}</td>
             <td><span class="badge ${statusBadgeClass(status)}">${status}</span></td>
             <td>${avaliacao}</td>
+            <td title="${comentario ? comentario.replace(/"/g, '&quot;') : ''}">${comentarioShort}</td>
             <td>${formatMoney(c.preco)}</td>
             <td>${origem}</td>
             <td>${destino}</td>
           </tr>
         `;
       }).join('');
-      tbody.innerHTML = rows || '<tr><td colspan="8">Nenhuma corrida encontrada</td></tr>';
+      tbody.innerHTML = rows || '<tr><td colspan="9">Nenhuma corrida encontrada</td></tr>';
       const stats = qs('#corridasStats');
       if (stats) {
         stats.textContent = `${corridas.length} corridas recentes`;
