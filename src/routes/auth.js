@@ -6,11 +6,21 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'defina_JWT_SECRET_no_env'; // Em produção, configure via .env
+const SIGNUP_TOKEN = process.env.SIGNUP_TOKEN || ''; // Token para restringir cadastro (opcional)
 
 // Cadastro
 router.post('/cadastro', async (req, res) => {
   try {
-    const { nome, email, senha, telefone, tipo } = req.body;
+    const { nome, email, senha, telefone, tipo, signupToken } = req.body;
+
+    // Se SIGNUP_TOKEN estiver definido no .env, exigir token de convite
+    if (SIGNUP_TOKEN) {
+      const tokenHeader = req.headers['x-signup-token'];
+      const provided = signupToken || tokenHeader;
+      if (provided !== SIGNUP_TOKEN) {
+        return res.status(403).json({ error: 'Cadastro bloqueado. Token inválido ou ausente.' });
+      }
+    }
 
     // Verificar se email já existe
     const usuarioExistente = await prisma.user.findUnique({
@@ -42,6 +52,13 @@ router.post('/cadastro', async (req, res) => {
       { expiresIn: '7d' }
     );
 
+    if (usuario.statusConta === 'bloqueado') {
+      return res.status(403).json({ error: 'Conta bloqueada pelo administrador' });
+    }
+    if (usuario.statusConta === 'suspenso' && usuario.suspensoAte && new Date(usuario.suspensoAte) > new Date()) {
+      return res.status(403).json({ error: 'Conta suspensa temporariamente' });
+    }
+
     res.json({
       token,
       usuario: {
@@ -52,7 +69,9 @@ router.post('/cadastro', async (req, res) => {
         tipo: usuario.tipo,
         cnhFrenteUri: usuario.cnhFrenteUri,
         cnhVersoUri: usuario.cnhVersoUri,
-        cnhStatus: usuario.cnhStatus
+        cnhStatus: usuario.cnhStatus,
+        statusConta: usuario.statusConta,
+        suspensoAte: usuario.suspensoAte
       }
     });
   } catch (error) {
@@ -73,6 +92,13 @@ router.post('/login', async (req, res) => {
 
     if (!usuario) {
       return res.status(401).json({ error: 'Email ou senha incorretos' });
+    }
+
+    if (usuario.statusConta === 'bloqueado') {
+      return res.status(403).json({ error: 'Conta bloqueada pelo administrador' });
+    }
+    if (usuario.statusConta === 'suspenso' && usuario.suspensoAte && new Date(usuario.suspensoAte) > new Date()) {
+      return res.status(403).json({ error: 'Conta suspensa temporariamente' });
     }
 
     // Verificar senha
@@ -102,7 +128,9 @@ router.post('/login', async (req, res) => {
         tipo: usuario.tipo,
         cnhFrenteUri: usuario.cnhFrenteUri,
         cnhVersoUri: usuario.cnhVersoUri,
-        cnhStatus: usuario.cnhStatus
+        cnhStatus: usuario.cnhStatus,
+        statusConta: usuario.statusConta,
+        suspensoAte: usuario.suspensoAte
       }
     });
   } catch (error) {
@@ -139,7 +167,9 @@ router.get('/verificar', async (req, res) => {
         tipo: usuario.tipo,
         cnhFrenteUri: usuario.cnhFrenteUri,
         cnhVersoUri: usuario.cnhVersoUri,
-        cnhStatus: usuario.cnhStatus
+        cnhStatus: usuario.cnhStatus,
+        statusConta: usuario.statusConta,
+        suspensoAte: usuario.suspensoAte
       }
     });
   } catch (error) {
@@ -186,7 +216,9 @@ router.put('/atualizar/:id', async (req, res) => {
       tipo: usuario.tipo,
       cnhFrenteUri: usuario.cnhFrenteUri,
       cnhVersoUri: usuario.cnhVersoUri,
-      cnhStatus: usuario.cnhStatus
+      cnhStatus: usuario.cnhStatus,
+      statusConta: usuario.statusConta,
+      suspensoAte: usuario.suspensoAte
     });
   } catch (error) {
     console.error('Erro ao atualizar perfil:', error);

@@ -4,47 +4,375 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Painel Admin - Uber Clone</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
   <style>
-    body { font-family: Arial, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
-    header { padding: 16px; background: #111827; display: flex; justify-content: space-between; align-items: center; }
-    h1 { margin: 0; font-size: 20px; }
-    main { padding: 16px; }
-    .card { background: #1f2937; border-radius: 10px; padding: 16px; margin-bottom: 12px; border: 1px solid #334155; }
-    .row { display: flex; flex-wrap: wrap; gap: 8px; }
+    :root {
+      --bg: #0a0f1e;
+      --bg-2: #0f1a36;
+      --card: #111827;
+      --card-2: #0f172a;
+      --stroke: #1f2a44;
+      --muted: #94a3b8;
+      --text: #e2e8f0;
+      --primary: #22d3ee;
+      --accent: #f59e0b;
+      --danger: #ef4444;
+      --ok: #22c55e;
+      --offline: #64748b;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", "Trebuchet MS", Tahoma, Verdana, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1000px 400px at 20% -10%, #1b2a5a 0%, transparent 60%),
+        radial-gradient(700px 360px at 90% -30%, #0b3a4b 0%, transparent 60%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 18px 24px;
+      background: rgba(7, 10, 20, 0.85);
+      border-bottom: 1px solid var(--stroke);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: 0.4px;
+    }
+
+    .status-pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #0b1326;
+      border: 1px solid var(--stroke);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    main { padding: 24px; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 88px;
+      align-self: start;
+      height: fit-content;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      color: var(--text);
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .nav-item.active {
+      background: rgba(34, 211, 238, 0.12);
+      border-color: rgba(34, 211, 238, 0.4);
+    }
+    .nav-item span {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .nav-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--stroke);
+    }
+    .nav-icon svg {
+      width: 14px;
+      height: 14px;
+      fill: var(--text);
+      opacity: 0.8;
+    }
+
+    .content {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      #map { height: 320px; }
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(17, 24, 39, 0.9), rgba(8, 12, 24, 0.95));
+      border: 1px solid var(--stroke);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 18px 40px rgba(5, 10, 20, 0.35);
+      animation: fadeUp 420ms ease;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .row { display: flex; flex-wrap: wrap; gap: 10px; }
     .col { flex: 1; min-width: 180px; }
-    label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 4px; }
-    input, select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #334155; background: #0b1220; color: #e2e8f0; }
-    button { padding: 10px 14px; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; }
-    .btn { background: #2563eb; color: white; }
-    .btn-ghost { background: #0b1220; color: #e2e8f0; border: 1px solid #334155; }
-    .btn-danger { background: #ef4444; color: white; }
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-    th, td { padding: 10px; border-bottom: 1px solid #334155; text-align: left; font-size: 13px; }
-    th { color: #cbd5e1; }
-    a { color: #38bdf8; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .badge { padding: 4px 8px; border-radius: 12px; font-size: 12px; }
-    .ok { background: #064e3b; color: #a7f3d0; }
-    .warn { background: #92400e; color: #fcd34d; }
-    .info { background: #0ea5e9; color: #e0f2fe; }
-    .muted { background: #1f2937; color: #94a3b8; }
-    .actions { display: flex; gap: 6px; }
-    .login-box { max-width: 400px; margin: 40px auto; }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--stroke);
+      background: #0b1220;
+      color: var(--text);
+    }
+
+    button {
+      padding: 9px 12px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 700;
+      font-family: inherit;
+    }
+    .btn { background: var(--primary); color: #04131c; }
+    .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--stroke); }
+    .btn-danger { background: var(--danger); color: white; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 10px; border-bottom: 1px solid var(--stroke); text-align: left; font-size: 13px; }
+    th { color: #cbd5e1; font-weight: 600; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge.online { background: rgba(34, 197, 94, 0.2); color: #b6f3c7; }
+    .badge.offline { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+    .badge.cnh-ok { background: rgba(34, 197, 94, 0.2); color: #b6f3c7; }
+    .badge.cnh-warn { background: rgba(245, 158, 11, 0.2); color: #fde68a; }
+    .badge.cnh-info { background: rgba(14, 165, 233, 0.2); color: #bae6fd; }
+    .badge.cnh-muted { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+    .badge.status-ok { background: rgba(34, 197, 94, 0.2); color: #b6f3c7; }
+    .badge.status-warn { background: rgba(245, 158, 11, 0.2); color: #fde68a; }
+    .badge.status-info { background: rgba(14, 165, 233, 0.2); color: #bae6fd; }
+    .badge.status-muted { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+    .badge.status-danger { background: rgba(239, 68, 68, 0.2); color: #fecaca; }
+
+    .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .login-box { max-width: 420px; margin: 40px auto; }
+    .split-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .muted { color: var(--muted); font-size: 12px; }
+
+    .section { display: none; }
+    .section.active { display: block; }
+
+    #map {
+      height: 520px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--stroke);
+    }
+
+    .map-legend {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    .marker {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      border: 2px solid #0b1220;
+      box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.15);
+    }
+    .marker.online { background: var(--ok); }
+    .marker.offline { background: var(--offline); }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 6, 14, 0.75);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 50;
+    }
+    .modal.active { display: flex; }
+    .modal-content {
+      width: min(980px, 95vw);
+      max-height: 90vh;
+      overflow: auto;
+      background: linear-gradient(180deg, rgba(12, 18, 34, 0.98), rgba(7, 10, 20, 0.98));
+      border: 1px solid var(--stroke);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 18px 45px rgba(3, 6, 14, 0.6);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .modal-title {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .close-btn {
+      background: transparent;
+      border: 1px solid var(--stroke);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 6px 10px;
+    }
+    .details-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .doc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .doc-card {
+      background: #0b1220;
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .doc-card img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 10px;
+      border: 1px solid var(--stroke);
+      background: #0a0f1e;
+    }
+    .inline-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+    }
   </style>
 </head>
 <body>
   <header>
     <h1>Painel Admin</h1>
-    <div id="authStatus"></div>
+    <div class="status-pill" id="authStatus">Aguardando login</div>
   </header>
   <main id="app"></main>
+  <div id="driverModal" class="modal" onclick="closeModal(event)">
+    <div class="modal-content" id="driverModalContent"></div>
+  </div>
 
+  <script src="/socket.io/socket.io.js"></script>
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
   <script>
     const apiBase = '/api/admin';
     let authHeader = null;
+    let map = null;
+    let mapFitted = false;
+    let socket = null;
+    const markers = new Map();
+    const motoristas = new Map();
+    let corridas = [];
+    let transacoes = [];
+    let refreshTimer = null;
+    let corridasReloadTimer = null;
 
     const qs = (sel) => document.querySelector(sel);
     const app = qs('#app');
+    const modal = qs('#driverModal');
+    const modalContent = qs('#driverModalContent');
+
+    const formatDate = (value) => {
+      if (!value) return '-';
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return '-';
+      return d.toLocaleString('pt-BR');
+    };
+    const formatMoney = (value) => {
+      const num = Number(value || 0);
+      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
+    };
+
+    const statusBadgeClass = (status) => {
+      if (status === 'aceita' || status === 'finalizada' || status === 'paga') return 'status-ok';
+      if (status === 'em_andamento' || status === 'em_viagem' || status === 'chegou') return 'status-info';
+      if (status === 'aguardando') return 'status-warn';
+      if (status === 'cancelada') return 'status-danger';
+      return 'status-muted';
+    };
+
+    function setStatus(text) {
+      const el = document.getElementById('authStatus');
+      if (el) el.textContent = text;
+    }
 
     function renderLogin() {
       app.innerHTML = `
@@ -52,7 +380,7 @@
           <h2>Login Admin (Basic Auth)</h2>
           <div class="row" style="margin-top:10px;">
             <div class="col">
-              <label>Usuário</label>
+              <label>Usuario</label>
               <input id="adminUser" value="admin" />
             </div>
             <div class="col">
@@ -70,82 +398,591 @@
     async function doLogin() {
       const u = qs('#adminUser').value.trim();
       const p = qs('#adminPass').value.trim();
-      if (!u || !p) return alert('Informe usuário e senha');
+      if (!u || !p) return alert('Informe usuario e senha');
       authHeader = 'Basic ' + btoa(u + ':' + p);
-      document.getElementById('authStatus').textContent = 'Admin logado';
       localStorage.setItem('adminAuth', authHeader);
-      loadUsuarios();
+      setStatus('Admin logado');
+      await initDashboard();
     }
 
-    async function loadUsuarios() {
-      app.innerHTML = `<div class="card">Carregando usuários...</div>`;
-      try {
-        const resp = await fetch(`${apiBase}/usuarios?tipo=motorista`, {
-          headers: { Authorization: authHeader }
-        });
-        if (resp.status === 401) {
-          renderLogin();
-          return;
-        }
-        const data = await resp.json();
-        renderUsuarios(data);
-      } catch (err) {
-        console.error(err);
-        app.innerHTML = `<div class="card">Erro ao carregar usuários</div>`;
+    function renderDashboard() {
+      app.innerHTML = `
+        <div class="layout">
+          <aside class="card sidebar">
+            <div style="margin-bottom: 10px;">
+              <strong>Menu</strong>
+            </div>
+            <div class="nav-item active" onclick="activateNav(this, 'mapaSection')">
+              <div class="legend-dot" style="background: var(--primary);"></div>
+              <div>
+                Mapa
+                <div><span>Tempo real</span></div>
+              </div>
+            </div>
+            <div class="nav-item" onclick="activateNav(this, 'motoristasSection')">
+              <div class="legend-dot" style="background: var(--primary);"></div>
+              <div>
+                Motoristas
+                <div><span>CNH e status</span></div>
+              </div>
+            </div>
+            <div class="nav-item" onclick="activateNav(this, 'corridasSection')">
+              <div class="legend-dot" style="background: var(--accent);"></div>
+              <div>
+                Corridas
+                <div><span>Em breve</span></div>
+              </div>
+            </div>
+            <div class="nav-item" onclick="activateNav(this, 'pagamentosSection')">
+              <div class="legend-dot" style="background: var(--ok);"></div>
+              <div>
+                Pagamentos
+                <div><span>Em breve</span></div>
+              </div>
+            </div>
+          </aside>
+          <section class="content">
+            <section class="section active" id="mapaSection">
+              <div class="card" id="mapSection">
+                <div class="split-header">
+                  <div>
+                    <h2 style="margin:0;">Mapa em tempo real</h2>
+                    <div class="muted" id="socketStatus">Socket: desconectado</div>
+                  </div>
+                  <button class="btn" onclick="fitMapToMarkers()">Ajustar mapa</button>
+                </div>
+                <div id="map"></div>
+                <div class="map-legend">
+                  <span><span class="legend-dot" style="background: var(--ok);"></span>Online</span>
+                  <span><span class="legend-dot" style="background: var(--offline);"></span>Offline</span>
+                </div>
+              </div>
+            </section>
+            <section class="section" id="motoristasSection">
+              <div class="card">
+                <div class="split-header">
+                  <div>
+                    <h2 style="margin:0;">Motoristas</h2>
+                    <div class="muted" id="statsText">Carregando...</div>
+                  </div>
+                  <div class="row">
+                    <button class="btn-ghost" onclick="reloadData()">Recarregar</button>
+                  </div>
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th>Contato</th>
+                      <th>Cadastro (CNH)</th>
+                      <th>Online</th>
+                      <th>Conta</th>
+                      <th>Ultima posicao</th>
+                      <th>Acoes</th>
+                    </tr>
+                  </thead>
+                  <tbody id="driversBody">
+                    <tr><td colspan="7">Carregando...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            <section class="section" id="corridasSection">
+              <div class="card">
+                <div class="split-header">
+                  <div>
+                    <h2 style="margin:0;">Corridas</h2>
+                    <div class="muted" id="corridasStats">Carregando...</div>
+                  </div>
+                  <button class="btn-ghost" onclick="reloadCorridas()">Recarregar</button>
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Passageiro</th>
+                      <th>Motorista</th>
+                      <th>Status</th>
+                      <th>Valor</th>
+                      <th>Origem</th>
+                      <th>Destino</th>
+                    </tr>
+                  </thead>
+                  <tbody id="corridasBody">
+                    <tr><td colspan="7">Carregando...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            <section class="section" id="pagamentosSection">
+              <div class="card">
+                <div class="split-header">
+                  <div>
+                    <h2 style="margin:0;">Pagamentos</h2>
+                    <div class="muted" id="pagamentosStats">Carregando...</div>
+                  </div>
+                  <button class="btn-ghost" onclick="reloadPagamentos()">Recarregar</button>
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Usuario</th>
+                      <th>Tipo</th>
+                      <th>Valor</th>
+                      <th>Descricao</th>
+                    </tr>
+                  </thead>
+                  <tbody id="pagamentosBody">
+                    <tr><td colspan="5">Carregando...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </section>
+        </div>
+      `;
+    }
+
+    function createMarkerIcon(status) {
+      const cls = status === 'online' ? 'online' : 'offline';
+      return L.divIcon({
+        className: '',
+        html: `<div class="marker ${cls}"></div>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+    }
+
+    function initMap() {
+      map = L.map('map', { zoomControl: true }).setView([-23.5505, -46.6333], 11);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
+    }
+
+    function fitMapToMarkers() {
+      if (!map) return;
+      const points = [];
+      markers.forEach((marker) => points.push(marker.getLatLng()));
+      if (points.length) {
+        map.fitBounds(points, { padding: [30, 30] });
       }
     }
 
-    function renderUsuarios(usuarios) {
-      const rows = usuarios.map(u => {
-        const frente = u.cnhFrenteUri ? `<a href="${u.cnhFrenteUri.startsWith('http') ? u.cnhFrenteUri : (location.origin + u.cnhFrenteUri)}" target="_blank">Frente</a>` : '-';
-        const verso = u.cnhVersoUri ? `<a href="${u.cnhVersoUri.startsWith('http') ? u.cnhVersoUri : (location.origin + u.cnhVersoUri)}" target="_blank">Verso</a>` : '-';
-        let statusClass = 'muted';
-        if (u.cnhStatus === 'aprovado') statusClass = 'ok';
-        else if (u.cnhStatus === 'reprovado') statusClass = 'warn';
-        else if (u.cnhStatus === 'enviado') statusClass = 'info';
+    function upsertMarker(motorista) {
+      if (!map || !motorista.localizacao) return;
+      const { latitude, longitude } = motorista.localizacao;
+      const status = motorista.statusOnline || 'offline';
+      const id = motorista.id;
+      const existing = markers.get(id);
+      if (existing) {
+        existing.setLatLng([latitude, longitude]);
+        existing.setIcon(createMarkerIcon(status));
+        existing.setPopupContent(`<strong>${motorista.nome || 'Motorista'}</strong><br/>${status}`);
+        return;
+      }
+      const marker = L.marker([latitude, longitude], {
+        icon: createMarkerIcon(status)
+      }).addTo(map);
+      marker.bindPopup(`<strong>${motorista.nome || 'Motorista'}</strong><br/>${status}`);
+      markers.set(id, marker);
+    }
+
+    function renderMotoristas() {
+      const tbody = qs('#driversBody');
+      if (!tbody) return;
+      const sorted = Array.from(motoristas.values()).sort((a, b) => {
+        if (a.statusOnline === b.statusOnline) {
+          return (a.nome || '').localeCompare(b.nome || '');
+        }
+        return a.statusOnline === 'online' ? -1 : 1;
+      });
+      const rows = sorted.map((m) => {
+        const statusBadge = m.statusOnline === 'online'
+          ? '<span class="badge online">Online</span>'
+          : '<span class="badge offline">Offline</span>';
+        const cnhStatus = m.cnhStatus || 'pendente';
+        let cnhClass = 'cnh-muted';
+        if (cnhStatus === 'aprovado') cnhClass = 'cnh-ok';
+        else if (cnhStatus === 'reprovado') cnhClass = 'cnh-warn';
+        else if (cnhStatus === 'enviado') cnhClass = 'cnh-info';
+        else if (cnhStatus === 'bloqueado') cnhClass = 'status-danger';
+        const cnhLabel = cnhStatus === 'reprovado' ? 'rejeitado' : cnhStatus;
+        const contaStatus = m.statusConta || 'ativo';
+        let contaClass = 'status-ok';
+        if (contaStatus === 'bloqueado') contaClass = 'status-danger';
+        else if (contaStatus === 'suspenso') contaClass = 'status-warn';
+        const pos = m.localizacao
+          ? `${m.localizacao.latitude.toFixed(5)}, ${m.localizacao.longitude.toFixed(5)}`
+          : '-';
+        const contato = [m.email, m.telefone].filter(Boolean).join(' | ') || '-';
         return `
           <tr>
-            <td>${u.nome || '-'}</td>
-            <td>${u.email || '-'}</td>
-            <td>${u.telefone || '-'}</td>
-            <td><span class="badge ${statusClass}">${u.cnhStatus || 'pendente'}</span></td>
-            <td>${frente} | ${verso}</td>
+            <td>${m.nome || '-'}</td>
+            <td>${contato}</td>
+            <td><span class="badge ${cnhClass}">${cnhLabel}</span></td>
+            <td>${statusBadge}</td>
+            <td><span class="badge ${contaClass}">${contaStatus}</span></td>
+            <td>${pos}</td>
             <td class="actions">
-              <button class="btn" onclick="atualizarStatus('${u.id}','aprovado')">Aprovar</button>
-              <button class="btn-ghost" onclick="atualizarStatus('${u.id}','pendente')">Pendente</button>
-              <button class="btn-ghost" onclick="atualizarStatus('${u.id}','enviado')">Enviado</button>
-              <button class="btn-danger" onclick="atualizarStatus('${u.id}','reprovado')">Reprovar</button>
+              <button class="btn" onclick="atualizarStatus('${m.id}','aprovado')">Aprovar</button>
+              <button class="btn-ghost" onclick="atualizarStatus('${m.id}','pendente')">Pendente</button>
+              <button class="btn-ghost" onclick="atualizarStatus('${m.id}','enviado')">Enviado</button>
+              <button class="btn-danger" onclick="atualizarStatus('${m.id}','reprovado')">Reprovar</button>
+              <button class="btn-ghost" onclick="abrirDetalhes('${m.id}')">Detalhes</button>
             </td>
           </tr>
         `;
       }).join('');
 
-      app.innerHTML = `
-        <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div>
-              <h2 style="margin:0;">Motoristas</h2>
-              <small>Revisão de CNH (frente/verso)</small>
+      tbody.innerHTML = rows || '<tr><td colspan="7">Nenhum motorista encontrado</td></tr>';
+      updateCounts();
+    }
+
+    function updateCounts() {
+      const total = motoristas.size;
+      let online = 0;
+      motoristas.forEach((m) => {
+        if (m.statusOnline === 'online') online += 1;
+      });
+      const el = qs('#statsText');
+      if (el) {
+        el.textContent = `${online} online de ${total} motoristas`;
+      }
+    }
+
+    function activateNav(el, sectionId) {
+      document.querySelectorAll('.nav-item').forEach((item) => item.classList.remove('active'));
+      if (el) el.classList.add('active');
+      document.querySelectorAll('.section').forEach((section) => section.classList.remove('active'));
+      const section = qs(`#${sectionId}`);
+      if (section) section.classList.add('active');
+      if (sectionId === 'mapaSection' && map) {
+        setTimeout(() => map.invalidateSize(), 200);
+      }
+    }
+
+    function closeModal(event) {
+      if (event && event.target !== modal) return;
+      if (modal) modal.classList.remove('active');
+    }
+
+    function renderDocCard(label, uri) {
+      const content = uri
+        ? `<a href="${uri}" target="_blank" rel="noreferrer"><img src="${uri}" alt="${label}"></a>`
+        : `<div class="small">Nao enviado</div>`;
+      return `
+        <div class="doc-card">
+          <strong>${label}</strong>
+          ${content}
+        </div>
+      `;
+    }
+
+    function renderDetalhes(data) {
+      if (!modalContent) return;
+      if (!data || !data.usuario) {
+        modalContent.innerHTML = '<div class="card">Nao foi possivel carregar os detalhes.</div>';
+        return;
+      }
+      const { usuario, carros = [], corridas = [], ganhos = {}, resumo = {} } = data;
+      const contaStatus = usuario.statusConta || 'ativo';
+      let contaClass = 'status-ok';
+      if (contaStatus === 'bloqueado') contaClass = 'status-danger';
+      else if (contaStatus === 'suspenso') contaClass = 'status-warn';
+
+      const cnhStatus = usuario.cnhStatus || 'pendente';
+      const cnhLabel = cnhStatus === 'reprovado' ? 'rejeitado' : cnhStatus;
+      const cnhBadgeClass = cnhStatus === 'aprovado'
+        ? 'cnh-ok'
+        : cnhStatus === 'reprovado'
+          ? 'cnh-warn'
+          : cnhStatus === 'enviado'
+            ? 'cnh-info'
+            : cnhStatus === 'bloqueado'
+              ? 'status-danger'
+              : 'cnh-muted';
+
+      const carrosHtml = carros.length
+        ? carros.map((c) => `
+            <div class="card" style="padding: 12px;">
+              <div style="display:flex; justify-content:space-between; gap:8px;">
+                <strong>${c.marca || '-'} ${c.modelo || '-'}</strong>
+                <span class="small">${c.placa || '-'}</span>
+              </div>
+              <div class="small">Cor: ${c.cor || '-'} | Ano: ${c.ano || '-'}</div>
+              <div class="small">Principal: ${c.principal ? 'sim' : 'nao'} | Ativo: ${c.ativo ? 'sim' : 'nao'}</div>
+              <div class="doc-grid">
+                ${renderDocCard('Seguro', c.docSeguroUri)}
+                ${renderDocCard('Inspecao', c.docInspecaoUri)}
+                ${renderDocCard('Licenciamento', c.docLicenciamentoUri)}
+              </div>
             </div>
-            <button class="btn" onclick="loadUsuarios()">Recarregar</button>
+          `).join('')
+        : '<div class="small">Nenhum veiculo cadastrado.</div>';
+
+      const corridasRows = corridas.length
+        ? corridas.map((c) => `
+            <tr>
+              <td>${formatDate(c.createdAt)}</td>
+              <td>${c.status || '-'}</td>
+              <td>${formatMoney(c.preco)}</td>
+              <td>${c.metodoPagamento || '-'}</td>
+            </tr>
+          `).join('')
+        : '<tr><td colspan="4">Nenhuma corrida encontrada</td></tr>';
+
+      modalContent.innerHTML = `
+        <div class="modal-header">
+          <div class="modal-title">
+            <h2 style="margin:0;">${usuario.nome || 'Motorista'}</h2>
+            <div class="small">${usuario.email || '-'} | ${usuario.telefone || '-'}</div>
           </div>
+          <button class="close-btn" onclick="closeModal()">Fechar</button>
+        </div>
+
+        <div class="details-grid">
+          <div class="card">
+            <strong>Status do cadastro</strong>
+            <div style="margin-top:6px;">
+              <span class="badge ${cnhBadgeClass}">${cnhLabel}</span>
+            </div>
+            <div class="small" style="margin-top:6px;">Criado em ${formatDate(usuario.createdAt)}</div>
+            <div class="inline-actions" style="margin-top:10px;">
+              <button class="btn" onclick="atualizarStatus('${usuario.id}','aprovado')">Aprovar</button>
+              <button class="btn-ghost" onclick="atualizarStatus('${usuario.id}','pendente')">Pendente</button>
+              <button class="btn-ghost" onclick="atualizarStatus('${usuario.id}','enviado')">Enviado</button>
+              <button class="btn-danger" onclick="atualizarStatus('${usuario.id}','reprovado')">Rejeitar</button>
+            </div>
+          </div>
+          <div class="card">
+            <strong>Status da conta</strong>
+            <div style="margin-top:6px;">
+              <span class="badge ${contaClass}">${contaStatus}</span>
+            </div>
+            <div class="small" style="margin-top:6px;">Suspenso ate: ${formatDate(usuario.suspensoAte)}</div>
+            <div class="inline-actions" style="margin-top:10px;">
+              <button class="btn" onclick="atualizarStatusConta('${usuario.id}','ativo')">Ativar</button>
+              <button class="btn-ghost" onclick="suspenderConta('${usuario.id}')">Suspender</button>
+              <button class="btn-danger" onclick="atualizarStatusConta('${usuario.id}','bloqueado')">Bloquear</button>
+            </div>
+          </div>
+          <div class="card">
+            <strong>Ganhos</strong>
+            <div class="small" style="margin-top:6px;">Creditos: ${formatMoney(ganhos.creditos)}</div>
+            <div class="small">Debitos: ${formatMoney(ganhos.debitos)}</div>
+            <div style="margin-top:8px; font-size: 16px;"><strong>Liquido: ${formatMoney(ganhos.liquido)}</strong></div>
+          </div>
+          <div class="card">
+            <strong>Resumo</strong>
+            <div class="small" style="margin-top:6px;">Total corridas: ${resumo.totalCorridas || 0}</div>
+            <div class="small">Total faturado: ${formatMoney(resumo.totalFaturado)}</div>
+            <div class="small">Avaliacoes: sem dados</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+          <strong>Documentos CNH</strong>
+          <div class="doc-grid">
+            ${renderDocCard('CNH frente', usuario.cnhFrenteUri)}
+            ${renderDocCard('CNH verso', usuario.cnhVersoUri)}
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+          <strong>Veiculos e documentos</strong>
+          <div style="margin-top:10px;">${carrosHtml}</div>
+        </div>
+
+        <div class="card" style="margin-top:12px;">
+          <strong>Historico de corridas</strong>
           <table>
             <thead>
               <tr>
-                <th>Nome</th>
-                <th>Email</th>
-                <th>Telefone</th>
-                <th>Status CNH</th>
-                <th>Documentos</th>
-                <th>Ações</th>
+                <th>Data</th>
+                <th>Status</th>
+                <th>Valor</th>
+                <th>Pagamento</th>
               </tr>
             </thead>
             <tbody>
-              ${rows || '<tr><td colspan="6">Nenhum usuário</td></tr>'}
+              ${corridasRows}
             </tbody>
           </table>
         </div>
       `;
+    }
+
+    async function abrirDetalhes(userId) {
+      if (!modal || !modalContent) return;
+      modal.classList.add('active');
+      modalContent.innerHTML = '<div class="card">Carregando detalhes...</div>';
+      try {
+        const resp = await fetch(`${apiBase}/usuarios/${userId}/detalhes`, {
+          headers: { Authorization: authHeader }
+        });
+        if (resp.status === 401) {
+          renderLogin();
+          closeModal();
+          return;
+        }
+        const data = await resp.json();
+        renderDetalhes(data);
+      } catch (err) {
+        modalContent.innerHTML = '<div class="card">Erro ao carregar detalhes.</div>';
+      }
+    }
+
+    async function loadMotoristas() {
+      const resp = await fetch(`${apiBase}/usuarios?tipo=motorista`, {
+        headers: { Authorization: authHeader }
+      });
+      if (resp.status === 401) {
+        renderLogin();
+        return;
+      }
+      const data = await resp.json();
+      data.forEach((u) => {
+        motoristas.set(u.id, {
+          id: u.id,
+          nome: u.nome,
+          email: u.email,
+          telefone: u.telefone,
+          cnhStatus: u.cnhStatus || 'pendente',
+          cnhFrenteUri: u.cnhFrenteUri || null,
+          cnhVersoUri: u.cnhVersoUri || null,
+          statusConta: u.statusConta || 'ativo',
+          suspensoAte: u.suspensoAte || null,
+          statusOnline: 'offline',
+          localizacao: null
+        });
+      });
+    }
+
+    async function loadCorridas() {
+      const resp = await fetch(`${apiBase}/corridas?limit=50`, {
+        headers: { Authorization: authHeader }
+      });
+      if (resp.status === 401) {
+        renderLogin();
+        return;
+      }
+      corridas = await resp.json();
+    }
+
+    function renderCorridas() {
+      const tbody = qs('#corridasBody');
+      if (!tbody) return;
+      const rows = corridas.map((c) => {
+        const passageiro = c.passageiro?.nome || c.passageiro?.email || '-';
+        const motorista = c.motorista?.nome || c.motorista?.email || '-';
+        const origem = c.origemEndereco || '-';
+        const destino = c.destinoEndereco || '-';
+        const status = c.status || '-';
+        return `
+          <tr>
+            <td>${formatDate(c.createdAt)}</td>
+            <td>${passageiro}</td>
+            <td>${motorista}</td>
+            <td><span class="badge ${statusBadgeClass(status)}">${status}</span></td>
+            <td>${formatMoney(c.preco)}</td>
+            <td>${origem}</td>
+            <td>${destino}</td>
+          </tr>
+        `;
+      }).join('');
+      tbody.innerHTML = rows || '<tr><td colspan="7">Nenhuma corrida encontrada</td></tr>';
+      const stats = qs('#corridasStats');
+      if (stats) {
+        stats.textContent = `${corridas.length} corridas recentes`;
+      }
+    }
+
+    async function loadPagamentos() {
+      const resp = await fetch(`${apiBase}/transacoes?limit=50`, {
+        headers: { Authorization: authHeader }
+      });
+      if (resp.status === 401) {
+        renderLogin();
+        return;
+      }
+      transacoes = await resp.json();
+    }
+
+    function renderPagamentos() {
+      const tbody = qs('#pagamentosBody');
+      if (!tbody) return;
+      const rows = transacoes.map((t) => {
+        const usuario = t.usuario?.nome || t.usuario?.email || '-';
+        const tipo = t.tipo || '-';
+        const tipoClass = tipo === 'credito' ? 'status-ok' : tipo === 'debito' ? 'status-warn' : 'status-muted';
+        const descricao = t.descricao || '-';
+        return `
+          <tr>
+            <td>${formatDate(t.createdAt)}</td>
+            <td>${usuario}</td>
+            <td><span class="badge ${tipoClass}">${tipo}</span></td>
+            <td>${formatMoney(t.valor)}</td>
+            <td>${descricao}</td>
+          </tr>
+        `;
+      }).join('');
+      tbody.innerHTML = rows || '<tr><td colspan="5">Nenhuma transacao encontrada</td></tr>';
+      const stats = qs('#pagamentosStats');
+      if (stats) {
+        stats.textContent = `${transacoes.length} transacoes recentes`;
+      }
+    }
+
+    async function loadOnline() {
+      const resp = await fetch(`${apiBase}/motoristas-online`, {
+        headers: { Authorization: authHeader }
+      });
+      if (resp.status === 401) {
+        renderLogin();
+        return;
+      }
+      const data = await resp.json();
+      data.forEach((m) => {
+        const current = motoristas.get(m.motoristaId) || { id: m.motoristaId };
+        const updated = {
+          ...current,
+          id: m.motoristaId,
+          nome: m.nome || current.nome,
+          cnhStatus: current.cnhStatus || 'pendente',
+          statusConta: current.statusConta || 'ativo',
+          statusOnline: 'online',
+          localizacao: m.localizacao || current.localizacao || null
+        };
+        motoristas.set(m.motoristaId, updated);
+        upsertMarker(updated);
+      });
+      if (!mapFitted) {
+        mapFitted = true;
+        fitMapToMarkers();
+      }
+    }
+
+    async function reloadData() {
+      motoristas.clear();
+      markers.forEach((marker) => marker.remove());
+      markers.clear();
+      mapFitted = false;
+      await loadMotoristas();
+      await loadOnline();
+      renderMotoristas();
+    }
+
+    async function reloadCorridas() {
+      await loadCorridas();
+      renderCorridas();
+    }
+
+    async function reloadPagamentos() {
+      await loadPagamentos();
+      renderPagamentos();
     }
 
     async function atualizarStatus(userId, status) {
@@ -162,18 +999,164 @@
           renderLogin();
           return;
         }
-        await loadUsuarios();
+        const updated = motoristas.get(userId);
+        if (updated) {
+          updated.cnhStatus = status;
+          motoristas.set(userId, updated);
+          renderMotoristas();
+        } else {
+          await reloadData();
+        }
+        if (modal && modal.classList.contains('active')) {
+          abrirDetalhes(userId);
+        }
       } catch (err) {
         alert('Erro ao atualizar status');
       }
     }
 
-    // Auto login se já tem credenciais
+    async function atualizarStatusConta(userId, status, suspensoAte = null) {
+      try {
+        const resp = await fetch(`${apiBase}/usuarios/${userId}/status-conta`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: authHeader
+          },
+          body: JSON.stringify({ status, suspensoAte })
+        });
+        if (resp.status === 401) {
+          renderLogin();
+          closeModal();
+          return;
+        }
+        const data = await resp.json();
+        const updated = motoristas.get(userId);
+        if (updated) {
+          updated.statusConta = data.statusConta;
+          updated.suspensoAte = data.suspensoAte;
+          motoristas.set(userId, updated);
+          renderMotoristas();
+        }
+        if (modal && modal.classList.contains('active')) {
+          abrirDetalhes(userId);
+        }
+      } catch (err) {
+        alert('Erro ao atualizar status da conta');
+      }
+    }
+
+    function suspenderConta(userId) {
+      const dias = prompt('Suspender por quantos dias?', '7');
+      if (!dias) return;
+      const diasNum = Number(dias);
+      if (!Number.isFinite(diasNum) || diasNum <= 0) {
+        alert('Numero de dias invalido');
+        return;
+      }
+      const ate = new Date();
+      ate.setDate(ate.getDate() + diasNum);
+      atualizarStatusConta(userId, 'suspenso', ate.toISOString());
+    }
+
+    function connectSocket() {
+      socket = io();
+      const socketStatus = qs('#socketStatus');
+      const setSocketText = (text) => { if (socketStatus) socketStatus.textContent = text; };
+
+      socket.on('connect', () => setSocketText(`Socket: conectado (${socket.id})`));
+      socket.on('disconnect', () => setSocketText('Socket: desconectado'));
+
+      socket.on('admin:motoristaOnline', (data) => {
+        const current = motoristas.get(data.motoristaId) || { id: data.motoristaId };
+        const updated = {
+          ...current,
+          id: data.motoristaId,
+          nome: data.nome || current.nome,
+          cnhStatus: current.cnhStatus || 'pendente',
+          statusConta: current.statusConta || 'ativo',
+          statusOnline: 'online',
+          localizacao: data.localizacao || current.localizacao || null
+        };
+        motoristas.set(data.motoristaId, updated);
+        upsertMarker(updated);
+        renderMotoristas();
+      });
+
+      socket.on('admin:motoristaOffline', (data) => {
+        if (!data) return;
+        const current = motoristas.get(data.motoristaId) || { id: data.motoristaId };
+        const updated = {
+          ...current,
+          id: data.motoristaId,
+          nome: data.nome || current.nome,
+          cnhStatus: current.cnhStatus || 'pendente',
+          statusConta: current.statusConta || 'ativo',
+          statusOnline: 'offline',
+          localizacao: data.localizacao || current.localizacao || null
+        };
+        motoristas.set(data.motoristaId, updated);
+        upsertMarker(updated);
+        renderMotoristas();
+      });
+
+      socket.on('admin:motoristaPosicao', (data) => {
+        if (!data) return;
+        const current = motoristas.get(data.motoristaId) || { id: data.motoristaId };
+        const updated = {
+          ...current,
+          id: data.motoristaId,
+          cnhStatus: current.cnhStatus || 'pendente',
+          statusConta: current.statusConta || 'ativo',
+          statusOnline: current.statusOnline || 'online',
+          localizacao: data.localizacao || current.localizacao || null
+        };
+        motoristas.set(data.motoristaId, updated);
+        upsertMarker(updated);
+        renderMotoristas();
+      });
+
+      socket.on('admin:corridaNova', () => {
+        if (corridasReloadTimer) clearTimeout(corridasReloadTimer);
+        corridasReloadTimer = setTimeout(() => reloadCorridas(), 500);
+      });
+
+      socket.on('admin:corridaAtualizada', () => {
+        if (corridasReloadTimer) clearTimeout(corridasReloadTimer);
+        corridasReloadTimer = setTimeout(() => reloadCorridas(), 500);
+      });
+    }
+
+    async function initDashboard() {
+      renderDashboard();
+      initMap();
+      connectSocket();
+      try {
+        await loadMotoristas();
+        await loadOnline();
+        renderMotoristas();
+        await loadCorridas();
+        renderCorridas();
+        await loadPagamentos();
+        renderPagamentos();
+        if (refreshTimer) clearInterval(refreshTimer);
+        refreshTimer = setInterval(async () => {
+          await loadCorridas();
+          renderCorridas();
+          await loadPagamentos();
+          renderPagamentos();
+        }, 15000);
+      } catch (err) {
+        console.error(err);
+        app.innerHTML = `<div class="card">Erro ao carregar dados</div>`;
+      }
+    }
+
     const saved = localStorage.getItem('adminAuth');
     if (saved) {
       authHeader = saved;
-      document.getElementById('authStatus').textContent = 'Admin logado';
-      loadUsuarios();
+      setStatus('Admin logado');
+      initDashboard();
     } else {
       renderLogin();
     }

@@ -22,6 +22,8 @@ model User {
   cnhFrenteUri String?
   cnhVersoUri  String?
   cnhStatus    String?  @default("pendente")
+  statusConta  String   @default("ativo") // ativo, bloqueado, suspenso
+  suspensoAte  DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
@@ -157,4 +159,3 @@ model AlertaAdmin {
   dados       String?
   criadoEm    DateTime @default(now())
 }
-

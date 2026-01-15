@@ -4,12 +4,26 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const { PrismaClient } = require('@prisma/client');
+const cloudinary = require('cloudinary').v2;
 
 const prisma = new PrismaClient();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }
 });
+
+const cloudinaryEnabled =
+  process.env.CLOUDINARY_CLOUD_NAME &&
+  process.env.CLOUDINARY_API_KEY &&
+  process.env.CLOUDINARY_API_SECRET;
+
+if (cloudinaryEnabled) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+  });
+}
 
 const ensureVeiculosDir = () => {
   const dir = path.join(__dirname, '..', '..', 'uploads', 'veiculos');
@@ -23,19 +37,44 @@ const ensureCnhDir = () => {
   return dir;
 };
 
-const salvarArquivo = (file, userId, tipo) => {
+const uploadToCloudinary = (file, folder, publicId) => new Promise((resolve, reject) => {
+  const stream = cloudinary.uploader.upload_stream(
+    {
+      folder,
+      public_id: publicId,
+      resource_type: 'auto'
+    },
+    (error, result) => {
+      if (error) return reject(error);
+      resolve(result.secure_url);
+    }
+  );
+  stream.end(file.buffer);
+});
+
+const salvarArquivo = async (file, userId, tipo) => {
   if (!file) return null;
+  const timestamp = Date.now();
+  const safeName = file.originalname.replace(/\s+/g, '_');
+  if (cloudinaryEnabled) {
+    return uploadToCloudinary(file, `uber-clone/veiculos/${userId}`, `${userId}_${tipo}_${timestamp}_${safeName}`);
+  }
   const dir = ensureVeiculosDir();
-  const filename = `${userId}_${tipo}_${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`;
+  const filename = `${userId}_${tipo}_${timestamp}_${safeName}`;
   const filepath = path.join(dir, filename);
   fs.writeFileSync(filepath, file.buffer);
   return `/uploads/veiculos/${filename}`;
 };
 
-const salvarArquivoCnh = (file, userId, tipo) => {
+const salvarArquivoCnh = async (file, userId, tipo) => {
   if (!file) return null;
+  const timestamp = Date.now();
+  const safeName = file.originalname.replace(/\s+/g, '_');
+  if (cloudinaryEnabled) {
+    return uploadToCloudinary(file, `uber-clone/cnh/${userId}`, `${userId}_${tipo}_${timestamp}_${safeName}`);
+  }
   const dir = ensureCnhDir();
-  const filename = `${userId}_${tipo}_${Date.now()}_${file.originalname.replace(/\s+/g, '_')}`;
+  const filename = `${userId}_${tipo}_${timestamp}_${safeName}`;
   const filepath = path.join(dir, filename);
   fs.writeFileSync(filepath, file.buffer);
   return `/uploads/cnh/${filename}`;
@@ -73,6 +112,10 @@ router.post('/:userId/carros', upload.fields([
       await prisma.carro.updateMany({ where: { userId }, data: { principal: false } });
     }
 
+    const docSeguroUri = await salvarArquivo(req.files?.fotoSeguro?.[0], userId, 'seguro');
+    const docInspecaoUri = await salvarArquivo(req.files?.fotoInspecao?.[0], userId, 'inspecao');
+    const docLicenciamentoUri = await salvarArquivo(req.files?.fotoLicenciamento?.[0], userId, 'licenciamento');
+
     const carro = await prisma.carro.create({
       data: {
         userId,
@@ -84,9 +127,9 @@ router.post('/:userId/carros', upload.fields([
         seguro,
         inspecao,
         licenciamento,
-        docSeguroUri: salvarArquivo(req.files?.fotoSeguro?.[0], userId, 'seguro'),
-        docInspecaoUri: salvarArquivo(req.files?.fotoInspecao?.[0], userId, 'inspecao'),
-        docLicenciamentoUri: salvarArquivo(req.files?.fotoLicenciamento?.[0], userId, 'licenciamento'),
+        docSeguroUri,
+        docInspecaoUri,
+        docLicenciamentoUri,
         principal: !!principal
       }
     });
@@ -116,6 +159,16 @@ router.put('/:userId/carros/:carroId', upload.fields([
       await prisma.carro.updateMany({ where: { userId }, data: { principal: false } });
     }
 
+    const docSeguroUri = req.files?.fotoSeguro?.[0]
+      ? await salvarArquivo(req.files.fotoSeguro[0], userId, 'seguro')
+      : carro.docSeguroUri;
+    const docInspecaoUri = req.files?.fotoInspecao?.[0]
+      ? await salvarArquivo(req.files.fotoInspecao[0], userId, 'inspecao')
+      : carro.docInspecaoUri;
+    const docLicenciamentoUri = req.files?.fotoLicenciamento?.[0]
+      ? await salvarArquivo(req.files.fotoLicenciamento[0], userId, 'licenciamento')
+      : carro.docLicenciamentoUri;
+
     const atualizado = await prisma.carro.update({
       where: { id: carroId },
       data: {
@@ -127,9 +180,9 @@ router.put('/:userId/carros/:carroId', upload.fields([
         seguro: typeof seguro !== 'undefined' ? seguro : carro.seguro,
         inspecao: typeof inspecao !== 'undefined' ? inspecao : carro.inspecao,
         licenciamento: typeof licenciamento !== 'undefined' ? licenciamento : carro.licenciamento,
-        docSeguroUri: req.files?.fotoSeguro?.[0] ? salvarArquivo(req.files.fotoSeguro[0], userId, 'seguro') : carro.docSeguroUri,
-        docInspecaoUri: req.files?.fotoInspecao?.[0] ? salvarArquivo(req.files.fotoInspecao[0], userId, 'inspecao') : carro.docInspecaoUri,
-        docLicenciamentoUri: req.files?.fotoLicenciamento?.[0] ? salvarArquivo(req.files.fotoLicenciamento[0], userId, 'licenciamento') : carro.docLicenciamentoUri,
+        docSeguroUri,
+        docInspecaoUri,
+        docLicenciamentoUri,
         principal: typeof principal !== 'undefined' ? !!principal : carro.principal,
         ativo: typeof ativo !== 'undefined' ? !!ativo : carro.ativo
       }
@@ -189,8 +242,8 @@ router.post('/:userId/cnh', upload.fields([
 ]), async (req, res) => {
   try {
     const { userId } = req.params;
-    const frenteUri = salvarArquivoCnh(req.files?.cnhFrente?.[0], userId, 'frente');
-    const versoUri = salvarArquivoCnh(req.files?.cnhVerso?.[0], userId, 'verso');
+    const frenteUri = await salvarArquivoCnh(req.files?.cnhFrente?.[0], userId, 'frente');
+    const versoUri = await salvarArquivoCnh(req.files?.cnhVerso?.[0], userId, 'verso');
 
     await prisma.user.update({
       where: { id: userId },

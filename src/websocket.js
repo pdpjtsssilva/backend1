@@ -6,6 +6,23 @@ const prisma = new PrismaClient();
 const motoristasOnline = new Map();
 const corridasAtivas = new Map();
 
+function emitAdmin(event, payload) {
+  if (!io) return;
+  io.emit(event, payload);
+}
+
+function snapshotMotorista(motoristaId) {
+  const motorista = motoristasOnline.get(motoristaId);
+  if (!motorista) return null;
+  return {
+    motoristaId,
+    nome: motorista.nome,
+    localizacao: motorista.localizacao || null,
+    disponivel: motorista.disponivel,
+    corridaAtual: motorista.corridaAtual || null
+  };
+}
+
 function initializeWebSocket(server) {
   io = socketIO(server, {
     cors: { origin: '*', methods: ['GET', 'POST'] }
@@ -24,15 +41,21 @@ function initializeWebSocket(server) {
         disponivel: true,
         corridaAtual: null
       });
-      console.log(`Motorista ${nome} (${motoristaId}) está online`);
-      // Não reenviamos corridas pendentes; apenas motoristas já online recebem novas solicitações.
+      console.log(`Motorista ${nome} (${motoristaId}) esta online`);
+      const snapshot = snapshotMotorista(motoristaId);
+      if (snapshot) {
+        emitAdmin('admin:motoristaOnline', snapshot);
+      }
+      // Nao reenviamos corridas pendentes; apenas motoristas online recebem novas solicitacoes.
     });
 
     // MOTORISTA: Ficar offline
     socket.on('motorista:offline', ({ motoristaId }) => {
       if (motoristasOnline.has(motoristaId)) {
+        const snapshot = snapshotMotorista(motoristaId);
         motoristasOnline.delete(motoristaId);
         console.log(`Motorista ${motoristaId} ficou offline`);
+        emitAdmin('admin:motoristaOffline', snapshot || { motoristaId });
       }
     });
 
@@ -42,6 +65,14 @@ function initializeWebSocket(server) {
       corridasAtivas.set(data.corridaId, {
         corridaId: data.corridaId,
         passageiroSocket: socket.id,
+        passageiroId: data.passageiroId,
+        origem: data.origem,
+        destino: data.destino,
+        preco: data.preco,
+        status: 'aguardando'
+      });
+      emitAdmin('admin:corridaNova', {
+        corridaId: data.corridaId,
         passageiroId: data.passageiroId,
         origem: data.origem,
         destino: data.destino,
@@ -75,6 +106,13 @@ function initializeWebSocket(server) {
         motoristaNome: data.motoristaNome,
         motoristaLocalizacao: data.motoristaLocalizacao
       });
+      emitAdmin('admin:corridaAtualizada', {
+        corridaId: data.corridaId,
+        status: 'aceita',
+        motoristaId: data.motoristaId,
+        motoristaNome: data.motoristaNome,
+        motoristaLocalizacao: data.motoristaLocalizacao
+      });
 
       socket.emit('motorista:corridaConfirmada', {
         corridaId: data.corridaId,
@@ -92,6 +130,10 @@ function initializeWebSocket(server) {
         ...(corridasAtivas.get(data.corridaId) || {}),
         status: 'chegou'
       });
+      emitAdmin('admin:corridaAtualizada', {
+        corridaId: data.corridaId,
+        status: 'chegou'
+      });
       prisma.corrida.update({ where: { id: data.corridaId }, data: { status: 'chegou' } })
         .catch((err) => console.error('Erro ao marcar chegada:', err.message));
     });
@@ -104,6 +146,10 @@ function initializeWebSocket(server) {
         ...(corridasAtivas.get(data.corridaId) || {}),
         status: 'em_andamento'
       });
+      emitAdmin('admin:corridaAtualizada', {
+        corridaId: data.corridaId,
+        status: 'em_andamento'
+      });
       prisma.corrida.update({ where: { id: data.corridaId }, data: { status: 'em_andamento' } })
         .catch((err) => console.error('Erro ao iniciar corrida:', err.message));
     });
@@ -113,6 +159,10 @@ function initializeWebSocket(server) {
       console.log('Corrida finalizada:', data.corridaId);
       io.emit('corrida:finalizada', { corridaId: data.corridaId });
       corridasAtivas.delete(data.corridaId);
+      emitAdmin('admin:corridaAtualizada', {
+        corridaId: data.corridaId,
+        status: 'finalizada'
+      });
 
       try {
         await prisma.corrida.update({
@@ -124,13 +174,17 @@ function initializeWebSocket(server) {
       }
     });
 
-    // MOTORISTA: Atualizar posição
+    // MOTORISTA: Atualizar posicao
     socket.on('motorista:atualizarPosicao', (data) => {
       const { motoristaId, latitude, longitude } = data;
       if (motoristasOnline.has(motoristaId)) {
         const motorista = motoristasOnline.get(motoristaId);
         motorista.localizacao = { latitude, longitude };
         motoristasOnline.set(motoristaId, motorista);
+        emitAdmin('admin:motoristaPosicao', {
+          motoristaId,
+          localizacao: { latitude, longitude }
+        });
       }
       corridasAtivas.forEach((corrida, corridaId) => {
         if (corrida.motoristaId === motoristaId) {
@@ -145,13 +199,15 @@ function initializeWebSocket(server) {
       });
     });
 
-    // Desconexão
+    // Desconexao
     socket.on('disconnect', () => {
       console.log('Cliente desconectado:', socket.id);
       motoristasOnline.forEach((motorista, motoristaId) => {
         if (motorista.socketId === socket.id) {
+          const snapshot = snapshotMotorista(motoristaId);
           motoristasOnline.delete(motoristaId);
           console.log(`Motorista ${motoristaId} offline`);
+          emitAdmin('admin:motoristaOffline', snapshot || { motoristaId });
         }
       });
     });
