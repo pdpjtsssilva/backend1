@@ -235,6 +235,11 @@
     }
     .marker.online { background: var(--ok); }
     .marker.offline { background: var(--offline); }
+    .comment-cell {
+      white-space: normal;
+      word-break: break-word;
+      max-width: 280px;
+    }
 
     .modal {
       position: fixed;
@@ -750,7 +755,7 @@
               <td>${formatDate(c.createdAt)}</td>
               <td>${c.status || '-'}</td>
               <td>${c.avaliacao ? `${c.avaliacao}★` : '-'}</td>
-              <td title="${c.comentarioAvaliacao ? c.comentarioAvaliacao.replace(/"/g, '&quot;') : ''}">${truncateText(c.comentarioAvaliacao)}</td>
+              <td class="comment-cell">${c.comentarioAvaliacao || '-'}</td>
               <td>${formatMoney(c.preco)}</td>
               <td>${c.metodoPagamento || '-'}</td>
             </tr>
@@ -909,15 +914,14 @@
         const status = c.status || '-';
         const avaliacao = c.avaliacao ? `${c.avaliacao}★` : '-';
         const comentario = c.comentarioAvaliacao || '';
-        const comentarioShort = truncateText(comentario);
-        return `
+                return `
           <tr>
             <td>${formatDate(c.createdAt)}</td>
             <td>${passageiro}</td>
             <td>${motorista}</td>
             <td><span class="badge ${statusBadgeClass(status)}">${status}</span></td>
             <td>${avaliacao}</td>
-            <td title="${comentario ? comentario.replace(/"/g, '&quot;') : ''}">${comentarioShort}</td>
+            <td class="comment-cell">${comentario || '-'}</td>
             <td>${formatMoney(c.preco)}</td>
             <td>${origem}</td>
             <td>${destino}</td>
