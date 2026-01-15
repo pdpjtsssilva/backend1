@@ -194,6 +194,12 @@ router.get('/usuarios/:id/detalhes', async (req, res) => {
       _sum: { preco: true }
     });
 
+    const avaliacaoResumo = await prisma.corrida.aggregate({
+      where: { motoristaId: id, avaliacao: { not: null } },
+      _count: { avaliacao: true },
+      _avg: { avaliacao: true }
+    });
+
     const ganhosCredito = await prisma.transacao.aggregate({
       where: { userId: id, tipo: 'credito' },
       _sum: { valor: true }
@@ -212,7 +218,9 @@ router.get('/usuarios/:id/detalhes', async (req, res) => {
       corridas,
       resumo: {
         totalCorridas: corridasResumo._count._all || 0,
-        totalFaturado: corridasResumo._sum.preco || 0
+        totalFaturado: corridasResumo._sum.preco || 0,
+        totalAvaliacoes: avaliacaoResumo._count.avaliacao || 0,
+        avaliacaoMedia: avaliacaoResumo._avg.avaliacao || 0
       },
       ganhos: {
         creditos,
