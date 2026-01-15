@@ -262,4 +262,31 @@ router.patch('/:id/finalizar', async (req, res) => {
   }
 });
 
+// ========================================
+// AVALIAR CORRIDA
+// ========================================
+router.put('/:id/avaliar', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { avaliacao, comentario } = req.body;
+    const nota = Number(avaliacao);
+    if (!Number.isFinite(nota) || nota < 1 || nota > 5) {
+      return res.status(400).json({ error: 'Avaliacao invalida' });
+    }
+
+    const corrida = await prisma.corrida.update({
+      where: { id },
+      data: {
+        avaliacao: nota,
+        comentarioAvaliacao: comentario || null
+      }
+    });
+
+    res.json(corrida);
+  } catch (error) {
+    console.error('Erro ao avaliar corrida:', error);
+    res.status(500).json({ erro: 'Erro ao avaliar corrida' });
+  }
+});
+
 module.exports = router;

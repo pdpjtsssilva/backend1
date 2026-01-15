@@ -53,6 +53,8 @@ model Corrida {
   preco            Float
   status           String   @default("aguardando") // aguardando, aceita, em_andamento, finalizada, cancelada, paga
   metodoPagamento  String?  // cartao, carteira, dinheiro
+  avaliacao        Int?
+  comentarioAvaliacao String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
