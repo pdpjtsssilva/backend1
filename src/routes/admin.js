@@ -278,7 +278,14 @@ router.get('/corridas', async (req, res) => {
       }
     });
 
-    const motoristaIds = Array.from(new Set(corridas.map((c) => c.motoristaId).filter(Boolean)));
+    const motoristaIds = Array.from(
+      new Set(
+        corridas
+          .map((c) => [c.motoristaId, c.ultimaRecusaMotoristaId])
+          .flat()
+          .filter(Boolean)
+      )
+    );
     const motoristas = motoristaIds.length
       ? await prisma.user.findMany({
         where: { id: { in: motoristaIds } },
@@ -289,7 +296,10 @@ router.get('/corridas', async (req, res) => {
 
     const payload = corridas.map((c) => ({
       ...c,
-      motorista: c.motoristaId ? (motoristaMap.get(c.motoristaId) || null) : null
+      motorista: c.motoristaId ? (motoristaMap.get(c.motoristaId) || null) : null,
+      ultimaRecusaMotorista: c.ultimaRecusaMotoristaId
+        ? (motoristaMap.get(c.ultimaRecusaMotoristaId) || null)
+        : null
     }));
 
     res.json(payload);
