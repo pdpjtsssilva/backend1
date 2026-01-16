@@ -11,7 +11,7 @@ const SIGNUP_TOKEN = process.env.SIGNUP_TOKEN || ''; // Token para restringir ca
 // Cadastro
 router.post('/cadastro', async (req, res) => {
   try {
-    const { nome, email, senha, telefone, tipo, signupToken } = req.body;
+    const { nome, email, senha, telefone, tipo, documento, signupToken } = req.body;
 
     // Se SIGNUP_TOKEN estiver definido no .env, exigir token de convite
     if (SIGNUP_TOKEN) {
@@ -28,9 +28,18 @@ router.post('/cadastro', async (req, res) => {
     });
 
     if (usuarioExistente) {
-      return res.status(400).json({ error: 'Email já cadastrado' });
+      return res.status(400).json({ error: 'Email ja cadastrado' });
     }
 
+    const documentoLimpo = documento?.trim();
+    if (documentoLimpo) {
+      const documentoExistente = await prisma.user.findFirst({
+        where: { documento: documentoLimpo }
+      });
+      if (documentoExistente) {
+        return res.status(400).json({ error: 'Documento ja cadastrado' });
+      }
+    }
     // Hash da senha
     const senhaHash = await bcrypt.hash(senha, 10);
 
@@ -41,6 +50,7 @@ router.post('/cadastro', async (req, res) => {
         email,
         senha: senhaHash,
         telefone,
+        documento: documentoLimpo || null,
         tipo: tipo || 'passageiro'
       }
     });
@@ -66,6 +76,7 @@ router.post('/cadastro', async (req, res) => {
         nome: usuario.nome,
         email: usuario.email,
         telefone: usuario.telefone,
+        documento: usuario.documento,
         tipo: usuario.tipo,
         cnhFrenteUri: usuario.cnhFrenteUri,
         cnhVersoUri: usuario.cnhVersoUri,
@@ -125,6 +136,7 @@ router.post('/login', async (req, res) => {
         nome: usuario.nome,
         email: usuario.email,
         telefone: usuario.telefone,
+        documento: usuario.documento,
         tipo: usuario.tipo,
         cnhFrenteUri: usuario.cnhFrenteUri,
         cnhVersoUri: usuario.cnhVersoUri,
@@ -164,6 +176,7 @@ router.get('/verificar', async (req, res) => {
         nome: usuario.nome,
         email: usuario.email,
         telefone: usuario.telefone,
+        documento: usuario.documento,
         tipo: usuario.tipo,
         cnhFrenteUri: usuario.cnhFrenteUri,
         cnhVersoUri: usuario.cnhVersoUri,
@@ -181,7 +194,7 @@ router.get('/verificar', async (req, res) => {
 router.put('/atualizar/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, email, telefone } = req.body;
+    const { nome, email, telefone, documento } = req.body;
 
     if (!nome || !email) {
       return res.status(400).json({ erro: 'Nome e email são obrigatórios' });
@@ -196,7 +209,20 @@ router.put('/atualizar/:id', async (req, res) => {
     });
 
     if (emailJaUsado) {
-      return res.status(400).json({ erro: 'Email já está em uso' });
+      return res.status(400).json({ erro: 'Email ja esta em uso' });
+    }
+
+    const documentoLimpo = documento?.trim();
+    if (documentoLimpo) {
+      const documentoJaUsado = await prisma.user.findFirst({
+        where: {
+          documento: documentoLimpo,
+          NOT: { id }
+        }
+      });
+      if (documentoJaUsado) {
+        return res.status(400).json({ erro: 'Documento ja esta em uso' });
+      }
     }
 
     const usuario = await prisma.user.update({
@@ -204,7 +230,8 @@ router.put('/atualizar/:id', async (req, res) => {
       data: {
         nome,
         email,
-        telefone
+        telefone,
+        documento: documentoLimpo || null
       }
     });
 
@@ -213,6 +240,7 @@ router.put('/atualizar/:id', async (req, res) => {
       nome: usuario.nome,
       email: usuario.email,
       telefone: usuario.telefone,
+      documento: usuario.documento,
       tipo: usuario.tipo,
       cnhFrenteUri: usuario.cnhFrenteUri,
       cnhVersoUri: usuario.cnhVersoUri,
@@ -227,3 +255,5 @@ router.put('/atualizar/:id', async (req, res) => {
 });
 
 module.exports = router;
+
+

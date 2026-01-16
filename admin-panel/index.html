@@ -148,7 +148,8 @@
     .row { display: flex; flex-wrap: wrap; gap: 10px; }
     .col { flex: 1; min-width: 180px; }
     label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
-    input {
+    input,
+    select {
       width: 100%;
       padding: 10px 12px;
       border-radius: 10px;
@@ -387,6 +388,7 @@
     const motoristas = new Map();
     let corridas = [];
     let transacoes = [];
+    let passageiros = [];
     let lastMotoristaPos = null;
     let refreshTimer = null;
     let corridasReloadTimer = null;
@@ -484,6 +486,13 @@
               <div>
                 Motoristas
                 <div><span>CNH e status</span></div>
+              </div>
+            </div>
+            <div class="nav-item" onclick="activateNav(this, 'passageirosSection')">
+              <div class="legend-dot" style="background: var(--accent);"></div>
+              <div>
+                Passageiros
+                <div><span>Usuarios e historico</span></div>
               </div>
             </div>
             <div class="nav-item" onclick="activateNav(this, 'corridasSection')">
@@ -592,6 +601,50 @@
                   </thead>
                   <tbody id="corridasBody">
                     <tr><td colspan="9">Carregando...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            <section class="section" id="passageirosSection">
+              <div class="card">
+                <div class="split-header">
+                  <div>
+                    <h2 style="margin:0;">Passageiros</h2>
+                    <div class="muted" id="passageirosStats">Carregando...</div>
+                  </div>
+                  <div class="row">
+                    <button class="btn-ghost" onclick="resetPassageiroFiltro()">Limpar filtros</button>
+                    <button class="btn" onclick="buscarPassageiros()">Buscar</button>
+                  </div>
+                </div>
+                <div class="row" style="margin-top:10px;">
+                  <div class="col">
+                    <label>Buscar (nome, email ou CPF)</label>
+                    <input id="passageiroBusca" placeholder="Ex: Maria ou 123.456.789-00" />
+                  </div>
+                  <div class="col">
+                    <label>Status</label>
+                    <select id="passageiroStatus">
+                      <option value="">Todos</option>
+                      <option value="ativo">Ativo</option>
+                      <option value="suspenso">Suspenso</option>
+                      <option value="bloqueado">Bloqueado</option>
+                    </select>
+                  </div>
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Nome</th>
+                      <th>Contato</th>
+                      <th>Documento</th>
+                      <th>Status</th>
+                      <th>Cadastro</th>
+                      <th>Acoes</th>
+                    </tr>
+                  </thead>
+                  <tbody id="passageirosBody">
+                    <tr><td colspan="6">Carregando...</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -745,6 +798,71 @@
       }
     }
 
+    function renderPassageiros() {
+      const tbody = qs('#passageirosBody');
+      if (!tbody) return;
+      const rows = passageiros.map((p) => {
+        const contaStatus = p.statusConta || 'ativo';
+        let contaClass = 'status-ok';
+        if (contaStatus === 'bloqueado') contaClass = 'status-danger';
+        else if (contaStatus === 'suspenso') contaClass = 'status-warn';
+        const contato = [p.email, p.telefone].filter(Boolean).join(' | ') || '-';
+        return `
+          <tr>
+            <td>${p.nome || '-'}</td>
+            <td>${contato}</td>
+            <td>${p.documento || '-'}</td>
+            <td><span class="badge ${contaClass}">${contaStatus}</span></td>
+            <td>${formatDate(p.createdAt)}</td>
+            <td class="actions">
+              <button class="btn" onclick="atualizarStatusConta('${p.id}','ativo')">Ativar</button>
+              <button class="btn-ghost" onclick="suspenderConta('${p.id}')">Suspender</button>
+              <button class="btn-danger" onclick="atualizarStatusConta('${p.id}','bloqueado')">Bloquear</button>
+              <button class="btn-ghost" onclick="abrirDetalhes('${p.id}')">Detalhes</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+      tbody.innerHTML = rows || '<tr><td colspan="6">Nenhum passageiro encontrado</td></tr>';
+      const stats = qs('#passageirosStats');
+      if (stats) {
+        stats.textContent = `${passageiros.length} passageiros encontrados`;
+      }
+    }
+
+    async function loadPassageiros({ search = '', status = '' } = {}) {
+      const params = new URLSearchParams({ tipo: 'passageiro' });
+      if (search) params.set('search', search);
+      if (status) params.set('status', status);
+      const resp = await fetch(`${apiBase}/usuarios?${params.toString()}`, {
+        headers: { Authorization: authHeader }
+      });
+      if (resp.status === 401) {
+        renderLogin();
+        return;
+      }
+      passageiros = await resp.json();
+    }
+
+    async function reloadPassageiros() {
+      const search = qs('#passageiroBusca')?.value?.trim() || '';
+      const status = qs('#passageiroStatus')?.value || '';
+      await loadPassageiros({ search, status });
+      renderPassageiros();
+    }
+
+    function buscarPassageiros() {
+      reloadPassageiros();
+    }
+
+    function resetPassageiroFiltro() {
+      const busca = qs('#passageiroBusca');
+      const status = qs('#passageiroStatus');
+      if (busca) busca.value = '';
+      if (status) status.value = '';
+      reloadPassageiros();
+    }
+
     function activateNav(el, sectionId) {
       document.querySelectorAll('.nav-item').forEach((item) => item.classList.remove('active'));
       if (el) el.classList.add('active');
@@ -753,6 +871,9 @@
       if (section) section.classList.add('active');
       if (sectionId === 'mapaSection' && map) {
         setTimeout(() => map.invalidateSize(), 200);
+      }
+      if (sectionId === 'passageirosSection' && passageiros.length === 0) {
+        reloadPassageiros();
       }
     }
 
@@ -780,6 +901,9 @@
         return;
       }
       const { usuario, carros = [], corridas = [], ganhos = {}, resumo = {} } = data;
+      const isMotorista = usuario.tipo === 'motorista';
+      const userLabel = isMotorista ? 'Motorista' : 'Passageiro';
+      const documento = usuario.documento || '-';
       const contaStatus = usuario.statusConta || 'ativo';
       let contaClass = 'status-ok';
       if (contaStatus === 'bloqueado') contaClass = 'status-danger';
@@ -816,34 +940,41 @@
         : '<div class="small">Nenhum veiculo cadastrado.</div>';
 
       const corridasRows = corridas.length
-        ? corridas.map((c) => `
-            <tr>
-              <td>${formatDate(c.createdAt)}</td>
-              <td>${c.status || '-'}</td>
-              <td>${c.avaliacao ? `${c.avaliacao}★` : '-'}</td>
-              <td class="comment-cell">${c.comentarioAvaliacao || '-'}</td>
-              <td>${formatMoney(c.preco)}</td>
-              <td>${c.metodoPagamento || '-'}</td>
-            </tr>
-          `).join('')
+        ? corridas.map((c) => {
+            const ratingValue = isMotorista ? c.avaliacao : c.avaliacaoPassageiro;
+            const comentarioValue = isMotorista ? c.comentarioAvaliacao : c.comentarioPassageiro;
+            return `
+              <tr>
+                <td>${formatDate(c.createdAt)}</td>
+                <td>${c.status || '-'}</td>
+                <td>${ratingValue ? `${ratingValue}*` : '-'}</td>
+                <td class="comment-cell">${comentarioValue || '-'}</td>
+                <td>${formatMoney(c.preco)}</td>
+                <td>${c.metodoPagamento || '-'}</td>
+              </tr>
+            `;
+          }).join('')
         : '<tr><td colspan="6">Nenhuma corrida encontrada</td></tr>';
 
-      modalContent.innerHTML = `
-        <div class="modal-header">
-          <div class="modal-title">
-            <h2 style="margin:0;">${usuario.nome || 'Motorista'}</h2>
-            <div class="small">${usuario.email || '-'} | ${usuario.telefone || '-'}</div>
+      const perfilCard = !isMotorista
+        ? `
+          <div class="card">
+            <strong>Perfil</strong>
+            <div class="small" style="margin-top:6px;">Documento: ${documento}</div>
+            <div class="small">Criado em ${formatDate(usuario.createdAt)}</div>
           </div>
-          <button class="close-btn" onclick="closeModal()">Fechar</button>
-        </div>
+        `
+        : '';
 
-        <div class="details-grid">
+      const cadastroCard = isMotorista
+        ? `
           <div class="card">
             <strong>Status do cadastro</strong>
             <div style="margin-top:6px;">
               <span class="badge ${cnhBadgeClass}">${cnhLabel}</span>
             </div>
-            <div class="small" style="margin-top:6px;">Criado em ${formatDate(usuario.createdAt)}</div>
+            <div class="small" style="margin-top:6px;">Documento: ${documento}</div>
+            <div class="small">Criado em ${formatDate(usuario.createdAt)}</div>
             <div class="inline-actions" style="margin-top:10px;">
               <button class="btn" onclick="atualizarStatus('${usuario.id}','aprovado')">Aprovar</button>
               <button class="btn-ghost" onclick="atualizarStatus('${usuario.id}','pendente')">Pendente</button>
@@ -851,6 +982,32 @@
               <button class="btn-danger" onclick="atualizarStatus('${usuario.id}','reprovado')">Rejeitar</button>
             </div>
           </div>
+        `
+        : '';
+
+      const ganhosCard = isMotorista
+        ? `
+          <div class="card">
+            <strong>Ganhos</strong>
+            <div class="small" style="margin-top:6px;">Creditos: ${formatMoney(ganhos.creditos)}</div>
+            <div class="small">Debitos: ${formatMoney(ganhos.debitos)}</div>
+            <div style="margin-top:8px; font-size: 16px;"><strong>Liquido: ${formatMoney(ganhos.liquido)}</strong></div>
+          </div>
+        `
+        : '';
+
+      modalContent.innerHTML = `
+        <div class="modal-header">
+          <div class="modal-title">
+            <h2 style="margin:0;">${usuario.nome || userLabel}</h2>
+            <div class="small">${usuario.email || '-'} | ${usuario.telefone || '-'} | Doc: ${documento}</div>
+          </div>
+          <button class="close-btn" onclick="closeModal()">Fechar</button>
+        </div>
+
+        <div class="details-grid">
+          ${cadastroCard}
+          ${perfilCard}
           <div class="card">
             <strong>Status da conta</strong>
             <div style="margin-top:6px;">
@@ -863,21 +1020,17 @@
               <button class="btn-danger" onclick="atualizarStatusConta('${usuario.id}','bloqueado')">Bloquear</button>
             </div>
           </div>
-          <div class="card">
-            <strong>Ganhos</strong>
-            <div class="small" style="margin-top:6px;">Creditos: ${formatMoney(ganhos.creditos)}</div>
-            <div class="small">Debitos: ${formatMoney(ganhos.debitos)}</div>
-            <div style="margin-top:8px; font-size: 16px;"><strong>Liquido: ${formatMoney(ganhos.liquido)}</strong></div>
-          </div>
+          ${ganhosCard}
           <div class="card">
             <strong>Resumo</strong>
             <div class="small" style="margin-top:6px;">Total corridas: ${resumo.totalCorridas || 0}</div>
-            <div class="small">Total faturado: ${formatMoney(resumo.totalFaturado)}</div>
+            <div class="small">${isMotorista ? 'Total faturado' : 'Total gasto'}: ${formatMoney(resumo.totalFaturado)}</div>
             <div class="small">Avaliacoes: ${resumo.totalAvaliacoes || 0}</div>
             <div class="small">Media: ${(resumo.avaliacaoMedia || 0).toFixed(1)}</div>
           </div>
         </div>
 
+        ${isMotorista ? `
         <div class="card" style="margin-top:12px;">
           <strong>Documentos CNH</strong>
           <div class="doc-grid">
@@ -890,6 +1043,7 @@
           <strong>Veiculos e documentos</strong>
           <div style="margin-top:10px;">${carrosHtml}</div>
         </div>
+        ` : ''}
 
         <div class="card" style="margin-top:12px;">
           <strong>Historico de corridas</strong>
@@ -1205,6 +1359,12 @@
           motoristas.set(userId, updated);
           renderMotoristas();
         }
+        const idx = passageiros.findIndex((p) => p.id === userId);
+        if (idx >= 0) {
+          passageiros[idx].statusConta = data.statusConta;
+          passageiros[idx].suspensoAte = data.suspensoAte;
+          renderPassageiros();
+        }
         if (modal && modal.classList.contains('active')) {
           abrirDetalhes(userId);
         }
@@ -1333,3 +1493,4 @@
   </script>
 </body>
 </html>
+

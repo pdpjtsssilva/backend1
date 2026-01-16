@@ -306,4 +306,31 @@ router.put('/:id/avaliar', async (req, res) => {
   }
 });
 
+// ========================================
+// AVALIAR PASSAGEIRO (Motorista)
+// ========================================
+router.put('/:id/avaliar-passageiro', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { avaliacao, comentario } = req.body;
+    const nota = Number(avaliacao);
+    if (!Number.isFinite(nota) || nota < 1 || nota > 5) {
+      return res.status(400).json({ error: 'Avaliacao invalida' });
+    }
+
+    const corrida = await prisma.corrida.update({
+      where: { id },
+      data: {
+        avaliacaoPassageiro: nota,
+        comentarioPassageiro: comentario || null
+      }
+    });
+
+    res.json(corrida);
+  } catch (error) {
+    console.error('Erro ao avaliar passageiro:', error);
+    res.status(500).json({ erro: 'Erro ao avaliar passageiro' });
+  }
+});
+
 module.exports = router;

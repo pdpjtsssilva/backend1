@@ -64,8 +64,20 @@ router.get('/motoristas-online', (_req, res) => {
 // Listar usuarios (foco motoristas) com CNH
 router.get('/usuarios', async (req, res) => {
   try {
-    const { tipo } = req.query;
-    const where = tipo ? { tipo } : {};
+    const { tipo, status, search } = req.query;
+    const filters = [];
+    if (tipo) filters.push({ tipo });
+    if (status) filters.push({ statusConta: status });
+    if (search) {
+      filters.push({
+        OR: [
+          { nome: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { documento: { contains: search, mode: 'insensitive' } }
+        ]
+      });
+    }
+    const where = filters.length ? { AND: filters } : {};
     const usuarios = await prisma.user.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -74,6 +86,7 @@ router.get('/usuarios', async (req, res) => {
         nome: true,
         email: true,
         telefone: true,
+        documento: true,
         tipo: true,
         cnhFrenteUri: true,
         cnhVersoUri: true,
@@ -166,6 +179,7 @@ router.get('/usuarios/:id/detalhes', async (req, res) => {
         nome: true,
         email: true,
         telefone: true,
+        documento: true,
         tipo: true,
         cnhFrenteUri: true,
         cnhVersoUri: true,
@@ -177,37 +191,51 @@ router.get('/usuarios/:id/detalhes', async (req, res) => {
     });
     if (!usuario) return res.status(404).json({ erro: 'Usuario nao encontrado' });
 
-    const carros = await prisma.carro.findMany({
-      where: { userId: id },
-      orderBy: { createdAt: 'desc' }
-    });
+    const isMotorista = usuario.tipo === 'motorista';
+
+    const carros = isMotorista
+      ? await prisma.carro.findMany({
+        where: { userId: id },
+        orderBy: { createdAt: 'desc' }
+      })
+      : [];
 
     const corridas = await prisma.corrida.findMany({
-      where: { motoristaId: id },
+      where: isMotorista ? { motoristaId: id } : { passageiroId: id },
       orderBy: { createdAt: 'desc' },
       take: 10
     });
 
     const corridasResumo = await prisma.corrida.aggregate({
-      where: { motoristaId: id },
+      where: isMotorista ? { motoristaId: id } : { passageiroId: id },
       _count: { _all: true },
       _sum: { preco: true }
     });
 
-    const avaliacaoResumo = await prisma.corrida.aggregate({
-      where: { motoristaId: id, avaliacao: { not: null } },
-      _count: { avaliacao: true },
-      _avg: { avaliacao: true }
-    });
+    const avaliacaoResumo = isMotorista
+      ? await prisma.corrida.aggregate({
+        where: { motoristaId: id, avaliacao: { not: null } },
+        _count: { avaliacao: true },
+        _avg: { avaliacao: true }
+      })
+      : await prisma.corrida.aggregate({
+        where: { passageiroId: id, avaliacaoPassageiro: { not: null } },
+        _count: { avaliacaoPassageiro: true },
+        _avg: { avaliacaoPassageiro: true }
+      });
 
-    const ganhosCredito = await prisma.transacao.aggregate({
-      where: { userId: id, tipo: 'credito' },
-      _sum: { valor: true }
-    });
-    const ganhosDebito = await prisma.transacao.aggregate({
-      where: { userId: id, tipo: 'debito' },
-      _sum: { valor: true }
-    });
+    const ganhosCredito = isMotorista
+      ? await prisma.transacao.aggregate({
+        where: { userId: id, tipo: 'credito' },
+        _sum: { valor: true }
+      })
+      : { _sum: { valor: 0 } };
+    const ganhosDebito = isMotorista
+      ? await prisma.transacao.aggregate({
+        where: { userId: id, tipo: 'debito' },
+        _sum: { valor: true }
+      })
+      : { _sum: { valor: 0 } };
 
     const creditos = ganhosCredito._sum.valor || 0;
     const debitos = ganhosDebito._sum.valor || 0;
@@ -219,8 +247,12 @@ router.get('/usuarios/:id/detalhes', async (req, res) => {
       resumo: {
         totalCorridas: corridasResumo._count._all || 0,
         totalFaturado: corridasResumo._sum.preco || 0,
-        totalAvaliacoes: avaliacaoResumo._count.avaliacao || 0,
-        avaliacaoMedia: avaliacaoResumo._avg.avaliacao || 0
+        totalAvaliacoes: isMotorista
+          ? (avaliacaoResumo._count.avaliacao || 0)
+          : (avaliacaoResumo._count.avaliacaoPassageiro || 0),
+        avaliacaoMedia: isMotorista
+          ? (avaliacaoResumo._avg.avaliacao || 0)
+          : (avaliacaoResumo._avg.avaliacaoPassageiro || 0)
       },
       ganhos: {
         creditos,
