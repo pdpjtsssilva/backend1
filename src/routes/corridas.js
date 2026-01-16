@@ -202,6 +202,23 @@ router.get('/motorista/:id', async (req, res) => {
 });
 
 // ========================================
+// OBTER CORRIDA POR ID
+// ========================================
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const corrida = await prisma.corrida.findUnique({ where: { id } });
+    if (!corrida) {
+      return res.status(404).json({ erro: 'Corrida nao encontrada' });
+    }
+    res.json(corrida);
+  } catch (error) {
+    console.error('Erro ao buscar corrida:', error);
+    res.status(500).json({ erro: 'Erro ao buscar corrida' });
+  }
+});
+
+// ========================================
 // CANCELAR CORRIDA
 // ========================================
 router.patch('/:id/cancelar', async (req, res) => {
