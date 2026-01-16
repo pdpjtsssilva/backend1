@@ -69,7 +69,8 @@ function initializeWebSocket(server) {
         origem: data.origem,
         destino: data.destino,
         preco: data.preco,
-        status: 'aguardando'
+        status: 'aguardando',
+        recusados: []
       });
       emitAdmin('admin:corridaNova', {
         corridaId: data.corridaId,
@@ -80,7 +81,7 @@ function initializeWebSocket(server) {
         status: 'aguardando'
       });
       // Envia para motoristas online no momento; se nenhum, permanece aguardando (sem reenviar depois)
-      motoristasOnline.forEach((motorista) => {
+      motoristasOnline.forEach((motorista, motoristaId) => {
         if (motorista.disponivel && !motorista.corridaAtual) {
           io.to(motorista.socketId).emit('corrida:novaSolicitacao', data);
         }
@@ -119,6 +120,37 @@ function initializeWebSocket(server) {
         status: 'aceita',
         destinoLat: corrida.destino?.latitude,
         destinoLng: corrida.destino?.longitude
+      });
+    });
+
+    // MOTORISTA: Recusar corrida
+    socket.on('motorista:recusarCorrida', (data) => {
+      const { corridaId, motoristaId } = data || {};
+      if (!corridaId || !motoristaId) return;
+      const corrida = corridasAtivas.get(corridaId);
+      if (!corrida) return;
+
+      const recusados = Array.isArray(corrida.recusados) ? corrida.recusados : [];
+      if (!recusados.includes(motoristaId)) recusados.push(motoristaId);
+      corridasAtivas.set(corridaId, { ...corrida, recusados, status: 'aguardando' });
+
+      if (corrida.passageiroSocket) {
+        io.to(corrida.passageiroSocket).emit('corrida:recusada', {
+          corridaId,
+          motoristaId
+        });
+      }
+
+      motoristasOnline.forEach((motorista, outroId) => {
+        if (!motorista.disponivel || motorista.corridaAtual) return;
+        if (recusados.includes(outroId)) return;
+        io.to(motorista.socketId).emit('corrida:novaSolicitacao', {
+          corridaId: corrida.corridaId,
+          passageiroId: corrida.passageiroId,
+          origem: corrida.origem,
+          destino: corrida.destino,
+          preco: corrida.preco
+        });
       });
     });
 
