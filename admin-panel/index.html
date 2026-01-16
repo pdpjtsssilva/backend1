@@ -592,15 +592,13 @@
                       <th>Passageiro</th>
                       <th>Motorista</th>
                       <th>Status</th>
-                      <th>Avaliacao</th>
-                      <th>Comentario</th>
                       <th>Valor</th>
                       <th>Origem</th>
                       <th>Destino</th>
                     </tr>
                   </thead>
                   <tbody id="corridasBody">
-                    <tr><td colspan="9">Carregando...</td></tr>
+                    <tr><td colspan="7">Carregando...</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -939,22 +937,42 @@
           `).join('')
         : '<div class="small">Nenhum veiculo cadastrado.</div>';
 
+      const corridasHeader = isMotorista
+        ? `
+          <tr>
+            <th>Data</th>
+            <th>Status</th>
+            <th>Avaliacao</th>
+            <th>Comentario</th>
+            <th>Valor</th>
+            <th>Pagamento</th>
+          </tr>
+        `
+        : `
+          <tr>
+            <th>Data</th>
+            <th>Status</th>
+            <th>Valor</th>
+            <th>Pagamento</th>
+          </tr>
+        `;
+
       const corridasRows = corridas.length
         ? corridas.map((c) => {
-            const ratingValue = isMotorista ? c.avaliacao : c.avaliacaoPassageiro;
-            const comentarioValue = isMotorista ? c.comentarioAvaliacao : c.comentarioPassageiro;
+            const ratingValue = c.avaliacao;
+            const comentarioValue = c.comentarioAvaliacao;
             return `
               <tr>
                 <td>${formatDate(c.createdAt)}</td>
                 <td>${c.status || '-'}</td>
-                <td>${ratingValue ? `${ratingValue}*` : '-'}</td>
-                <td class="comment-cell">${comentarioValue || '-'}</td>
+                ${isMotorista ? `<td>${ratingValue ? `${ratingValue}*` : '-'}</td>` : ''}
+                ${isMotorista ? `<td class="comment-cell">${comentarioValue || '-'}</td>` : ''}
                 <td>${formatMoney(c.preco)}</td>
                 <td>${c.metodoPagamento || '-'}</td>
               </tr>
             `;
           }).join('')
-        : '<tr><td colspan="6">Nenhuma corrida encontrada</td></tr>';
+        : `<tr><td colspan="${isMotorista ? 6 : 4}">Nenhuma corrida encontrada</td></tr>`;
 
       const perfilCard = !isMotorista
         ? `
@@ -1049,14 +1067,7 @@
           <strong>Historico de corridas</strong>
           <table>
             <thead>
-              <tr>
-                <th>Data</th>
-                <th>Status</th>
-                <th>Avaliacao</th>
-                <th>Comentario</th>
-                <th>Valor</th>
-                <th>Pagamento</th>
-              </tr>
+              ${corridasHeader}
             </thead>
             <tbody>
               ${corridasRows}
@@ -1198,23 +1209,19 @@
         const origem = c.origemEndereco || '-';
         const destino = c.destinoEndereco || '-';
         const status = c.status || '-';
-        const avaliacao = c.avaliacao ? `${c.avaliacao}★` : '-';
-        const comentario = c.comentarioAvaliacao || '';
-                return `
+        return `
           <tr>
             <td>${formatDate(c.createdAt)}</td>
             <td>${passageiro}</td>
             <td>${motorista}</td>
             <td><span class="badge ${statusBadgeClass(status)}">${status}</span></td>
-            <td>${avaliacao}</td>
-            <td class="comment-cell">${comentario || '-'}</td>
             <td>${formatMoney(c.preco)}</td>
             <td>${origem}</td>
             <td>${destino}</td>
           </tr>
         `;
       }).join('');
-      tbody.innerHTML = rows || '<tr><td colspan="9">Nenhuma corrida encontrada</td></tr>';
+      tbody.innerHTML = rows || '<tr><td colspan="7">Nenhuma corrida encontrada</td></tr>';
       const stats = qs('#corridasStats');
       if (stats) {
         stats.textContent = `${corridas.length} corridas recentes`;
@@ -1493,4 +1500,6 @@
   </script>
 </body>
 </html>
+
+
 
