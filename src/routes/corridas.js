@@ -54,6 +54,25 @@ router.post('/solicitar', async (req, res) => {
       }
     });
 
+    try {
+      const passageiro = await prisma.user.findUnique({
+        where: { id: passageiroId },
+        select: { nome: true }
+      });
+      emitirNovaSolicitacaoParaMotoristas({
+        corridaId: corrida.id,
+        passageiroId,
+        passageiroNome: passageiro?.nome || null,
+        origem: { latitude: origemLat, longitude: origemLng },
+        destino: { latitude: destinoLat, longitude: destinoLng },
+        origemEndereco: corrida.origemEndereco,
+        destinoEndereco: corrida.destinoEndereco,
+        preco: corrida.preco
+      });
+    } catch (err) {
+      console.error('Erro ao notificar motoristas:', err.message);
+    }
+
     res.status(201).json(corrida);
   } catch (error) {
     console.error('Erro ao solicitar corrida:', error);

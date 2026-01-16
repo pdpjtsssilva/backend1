@@ -5,6 +5,7 @@ let io;
 const prisma = new PrismaClient();
 const motoristasOnline = new Map();
 const corridasAtivas = new Map();
+const passageirosOnline = new Map();
 
 function emitAdmin(event, payload) {
   if (!io) return;
@@ -21,6 +22,39 @@ function snapshotMotorista(motoristaId) {
     disponivel: motorista.disponivel,
     corridaAtual: motorista.corridaAtual || null
   };
+}
+
+function emitirNovaSolicitacaoParaMotoristas(data) {
+  if (!io || !data?.corridaId || corridasAtivas.has(data.corridaId)) return;
+  const passageiroSocket = passageirosOnline.get(data.passageiroId) || null;
+  corridasAtivas.set(data.corridaId, {
+    corridaId: data.corridaId,
+    passageiroSocket,
+    passageiroId: data.passageiroId,
+    passageiroNome: data.passageiroNome,
+    origem: data.origem,
+    destino: data.destino,
+    origemEndereco: data.origemEndereco,
+    destinoEndereco: data.destinoEndereco,
+    preco: data.preco,
+    status: 'aguardando',
+    recusados: []
+  });
+
+  emitAdmin('admin:corridaNova', {
+    corridaId: data.corridaId,
+    passageiroId: data.passageiroId,
+    origem: data.origem,
+    destino: data.destino,
+    preco: data.preco,
+    status: 'aguardando'
+  });
+
+  motoristasOnline.forEach((motorista) => {
+    if (motorista.disponivel && !motorista.corridaAtual) {
+      io.to(motorista.socketId).emit('corrida:novaSolicitacao', data);
+    }
+  });
 }
 
 function initializeWebSocket(server) {
@@ -65,6 +99,12 @@ function initializeWebSocket(server) {
       });
     });
 
+    // PASSAGEIRO: Registrar socket
+    socket.on('passageiro:entrar', ({ passageiroId }) => {
+      if (!passageiroId) return;
+      passageirosOnline.set(passageiroId, socket.id);
+    });
+
     // MOTORISTA: Ficar offline
     socket.on('motorista:offline', ({ motoristaId }) => {
       if (motoristasOnline.has(motoristaId)) {
@@ -78,6 +118,8 @@ function initializeWebSocket(server) {
     // PASSAGEIRO: Solicitar corrida
     socket.on('passageiro:solicitarCorrida', (data) => {
       console.log('Nova corrida solicitada:', data.corridaId);
+      if (corridasAtivas.has(data.corridaId)) return;
+      passageirosOnline.set(data.passageiroId, socket.id);
       corridasAtivas.set(data.corridaId, {
         corridaId: data.corridaId,
         passageiroSocket: socket.id,
@@ -153,8 +195,18 @@ function initializeWebSocket(server) {
       if (!recusados.includes(motoristaId)) recusados.push(motoristaId);
       corridasAtivas.set(corridaId, { ...corrida, recusados, status: 'aguardando' });
 
-      if (corrida.passageiroSocket) {
-        io.to(corrida.passageiroSocket).emit('corrida:recusada', {
+      prisma.corrida.update({
+        where: { id: corridaId },
+        data: {
+          recusaCount: { increment: 1 },
+          ultimaRecusaMotoristaId: motoristaId,
+          ultimaRecusaEm: new Date()
+        }
+      }).catch((err) => console.error('Erro ao registrar recusa:', err.message));
+
+      const passageiroSocket = corrida.passageiroSocket || passageirosOnline.get(corrida.passageiroId);
+      if (passageiroSocket) {
+        io.to(passageiroSocket).emit('corrida:recusada', {
           corridaId,
           motoristaId
         });
@@ -257,6 +309,11 @@ function initializeWebSocket(server) {
     // Desconexao
     socket.on('disconnect', () => {
       console.log('Cliente desconectado:', socket.id);
+      passageirosOnline.forEach((sockId, passageiroId) => {
+        if (sockId === socket.id) {
+          passageirosOnline.delete(passageiroId);
+        }
+      });
       motoristasOnline.forEach((motorista, motoristaId) => {
         if (motorista.socketId === socket.id) {
           const snapshot = snapshotMotorista(motoristaId);
@@ -271,4 +328,4 @@ function initializeWebSocket(server) {
   console.log('WS Server inicializado!');
 }
 
-module.exports = { initializeWebSocket, motoristasOnline };
+module.exports = { initializeWebSocket, motoristasOnline, emitirNovaSolicitacaoParaMotoristas };
