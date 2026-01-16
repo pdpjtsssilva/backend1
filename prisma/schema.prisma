@@ -55,6 +55,9 @@ model Corrida {
   status           String   @default("aguardando") // aguardando, aceita, em_andamento, finalizada, cancelada, paga
   metodoPagamento  String?  // cartao, carteira, dinheiro
   canceladoPor     String?  // passageiro, motorista, admin
+  recusaCount      Int      @default(0)
+  ultimaRecusaMotoristaId String?
+  ultimaRecusaEm   DateTime?
   avaliacao        Int?
   comentarioAvaliacao String?
   avaliacaoPassageiro Int?
