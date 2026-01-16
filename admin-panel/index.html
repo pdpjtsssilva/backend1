@@ -240,6 +240,46 @@
       word-break: break-word;
       max-width: 280px;
     }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .kpi-card {
+      background: linear-gradient(160deg, rgba(16, 24, 44, 0.9), rgba(10, 16, 32, 0.9));
+      border: 1px solid var(--stroke);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .kpi-title { font-size: 12px; color: var(--muted); }
+    .kpi-value { font-size: 22px; font-weight: 700; margin-top: 6px; }
+    .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      height: 140px;
+      padding: 8px;
+      background: #0b1220;
+      border: 1px solid var(--stroke);
+      border-radius: 12px;
+    }
+    .bar {
+      flex: 1;
+      background: linear-gradient(180deg, rgba(34, 211, 238, 0.8), rgba(14, 165, 233, 0.8));
+      border-radius: 6px 6px 2px 2px;
+      min-width: 10px;
+      position: relative;
+    }
+    .bar span {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      color: var(--muted);
+    }
 
     .modal {
       position: fixed;
@@ -350,6 +390,7 @@
     let lastMotoristaPos = null;
     let refreshTimer = null;
     let corridasReloadTimer = null;
+    let dashboardTimer = null;
 
     const qs = (sel) => document.querySelector(sel);
     const app = qs('#app');
@@ -424,7 +465,14 @@
             <div style="margin-bottom: 10px;">
               <strong>Menu</strong>
             </div>
-            <div class="nav-item active" onclick="activateNav(this, 'mapaSection')">
+            <div class="nav-item active" onclick="activateNav(this, 'dashboardSection')">
+              <div class="legend-dot" style="background: var(--accent);"></div>
+              <div>
+                Dashboard
+                <div><span>Estatisticas</span></div>
+              </div>
+            </div>
+            <div class="nav-item" onclick="activateNav(this, 'mapaSection')">
               <div class="legend-dot" style="background: var(--primary);"></div>
               <div>
                 Mapa
@@ -454,7 +502,25 @@
             </div>
           </aside>
           <section class="content">
-            <section class="section active" id="mapaSection">
+            <section class="section active" id="dashboardSection">
+              <div class="kpi-grid" id="kpiGrid">
+                <div class="kpi-card"><div class="kpi-title">Usuarios</div><div class="kpi-value">-</div></div>
+                <div class="kpi-card"><div class="kpi-title">Corridas hoje</div><div class="kpi-value">-</div></div>
+                <div class="kpi-card"><div class="kpi-title">Receita</div><div class="kpi-value">-</div></div>
+                <div class="kpi-card"><div class="kpi-title">Motoristas ativos</div><div class="kpi-value">-</div></div>
+              </div>
+              <div class="card">
+                <div class="split-header">
+                  <div>
+                    <h2 style="margin:0;">Crescimento semanal</h2>
+                    <div class="muted" id="graficoStats">Carregando...</div>
+                  </div>
+                  <button class="btn-ghost" onclick="reloadDashboard()">Recarregar</button>
+                </div>
+                <div class="chart" id="graficoSemanal"></div>
+              </div>
+            </section>
+            <section class="section" id="mapaSection">
               <div class="card" id="mapSection">
                 <div class="split-header">
                   <div>
@@ -903,6 +969,72 @@
       corridas = await resp.json();
     }
 
+    async function loadDashboard() {
+      const resp = await fetch(`${apiBase}/dashboard`, {
+        headers: { Authorization: authHeader }
+      });
+      if (resp.status === 401) {
+        renderLogin();
+        return null;
+      }
+      return resp.json();
+    }
+
+    function renderDashboardStats(data) {
+      const grid = qs('#kpiGrid');
+      const grafico = qs('#graficoSemanal');
+      const stats = qs('#graficoStats');
+      if (!grid || !grafico) return;
+
+      const usuarios = data?.usuarios || {};
+      const corridasData = data?.corridas || {};
+      const receita = data?.receita || {};
+      const motoristasAtivos = data?.motoristasAtivos || 0;
+
+      grid.innerHTML = `
+        <div class="kpi-card">
+          <div class="kpi-title">Usuarios</div>
+          <div class="kpi-value">${usuarios.total || 0}</div>
+          <div class="kpi-sub">${usuarios.passageiros || 0} passageiros • ${usuarios.motoristas || 0} motoristas</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Corridas</div>
+          <div class="kpi-value">${corridasData.hoje || 0}</div>
+          <div class="kpi-sub">${corridasData.semana || 0} semana • ${corridasData.mes || 0} mes</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Receita</div>
+          <div class="kpi-value">${formatMoney(receita.total || 0)}</div>
+          <div class="kpi-sub">Comissao ${formatMoney(receita.comissao || 0)}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Motoristas ativos</div>
+          <div class="kpi-value">${motoristasAtivos}</div>
+          <div class="kpi-sub">${corridasData.emAndamento || 0} corridas em andamento</div>
+        </div>
+      `;
+
+      const serie = data?.graficoSemanal || [];
+      const max = Math.max(1, ...serie.map((d) => d.total));
+      grafico.innerHTML = serie.map((d) => {
+        const height = Math.round((d.total / max) * 120);
+        return `
+          <div class="bar" style="height:${height}px">
+            <span>${d.total}</span>
+          </div>
+        `;
+      }).join('');
+      if (stats) {
+        const total = serie.reduce((acc, item) => acc + item.total, 0);
+        stats.textContent = `${total} corridas nos ultimos 7 dias`;
+      }
+    }
+
+    async function reloadDashboard() {
+      const data = await loadDashboard();
+      if (data) renderDashboardStats(data);
+    }
+
     function renderCorridas() {
       const tbody = qs('#corridasBody');
       if (!tbody) return;
@@ -1174,6 +1306,9 @@
         renderCorridas();
         await loadPagamentos();
         renderPagamentos();
+        await reloadDashboard();
+        if (dashboardTimer) clearInterval(dashboardTimer);
+        dashboardTimer = setInterval(reloadDashboard, 15000);
         if (refreshTimer) clearInterval(refreshTimer);
         refreshTimer = setInterval(async () => {
           await loadCorridas();

@@ -293,4 +293,79 @@ router.get('/transacoes', async (req, res) => {
   }
 });
 
+// Dashboard: estatisticas em tempo real
+router.get('/dashboard', async (_req, res) => {
+  try {
+    const now = new Date();
+    const startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startWeek = new Date(now);
+    startWeek.setDate(now.getDate() - 6);
+    const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [usuariosTotal, usuariosPassageiros, usuariosMotoristas] = await Promise.all([
+      prisma.user.count(),
+      prisma.user.count({ where: { tipo: 'passageiro' } }),
+      prisma.user.count({ where: { tipo: 'motorista' } })
+    ]);
+
+    const [corridasHoje, corridasSemana, corridasMes] = await Promise.all([
+      prisma.corrida.count({ where: { createdAt: { gte: startDay } } }),
+      prisma.corrida.count({ where: { createdAt: { gte: startWeek } } }),
+      prisma.corrida.count({ where: { createdAt: { gte: startMonth } } })
+    ]);
+
+    const receitaTotal = await prisma.corrida.aggregate({
+      where: { status: 'paga' },
+      _sum: { preco: true }
+    });
+    const receita = receitaTotal._sum.preco || 0;
+    const comissao = receita * 0.2;
+
+    const corridasEmAndamento = await prisma.corrida.count({
+      where: { status: { in: ['aceita', 'em_andamento', 'chegou', 'em_viagem'] } }
+    });
+
+    const motoristasAtivos = Array.from(motoristasOnline.values()).filter((m) => m).length;
+
+    const dias = Array.from({ length: 7 }, (_, idx) => {
+      const day = new Date(now);
+      day.setDate(now.getDate() - (6 - idx));
+      return new Date(day.getFullYear(), day.getMonth(), day.getDate());
+    });
+    const corridasSemanaRaw = await Promise.all(
+      dias.map((day) => {
+        const next = new Date(day);
+        next.setDate(day.getDate() + 1);
+        return prisma.corrida.count({ where: { createdAt: { gte: day, lt: next } } });
+      })
+    );
+
+    res.json({
+      usuarios: {
+        total: usuariosTotal,
+        passageiros: usuariosPassageiros,
+        motoristas: usuariosMotoristas
+      },
+      corridas: {
+        hoje: corridasHoje,
+        semana: corridasSemana,
+        mes: corridasMes,
+        emAndamento: corridasEmAndamento
+      },
+      receita: {
+        total: receita,
+        comissao
+      },
+      motoristasAtivos,
+      graficoSemanal: dias.map((day, idx) => ({
+        data: day.toISOString().slice(0, 10),
+        total: corridasSemanaRaw[idx]
+      }))
+    });
+  } catch (error) {
+    console.error('Erro ao carregar dashboard:', error);
+    res.status(500).json({ erro: 'Erro ao carregar dashboard' });
+  }
+});
+
 module.exports = router;
