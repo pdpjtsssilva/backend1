@@ -51,11 +51,15 @@ function initializeWebSocket(server) {
         if (!corrida || corrida.status !== 'aguardando') return;
         const recusados = Array.isArray(corrida.recusados) ? corrida.recusados : [];
         if (recusados.includes(motoristaId)) return;
+        console.log(`Reenviando corrida pendente ${corrida.corridaId} para motorista ${motoristaId}`);
         io.to(socket.id).emit('corrida:novaSolicitacao', {
           corridaId: corrida.corridaId,
           passageiroId: corrida.passageiroId,
+          passageiroNome: corrida.passageiroNome,
           origem: corrida.origem,
           destino: corrida.destino,
+          origemEndereco: corrida.origemEndereco,
+          destinoEndereco: corrida.destinoEndereco,
           preco: corrida.preco
         });
       });
@@ -78,8 +82,11 @@ function initializeWebSocket(server) {
         corridaId: data.corridaId,
         passageiroSocket: socket.id,
         passageiroId: data.passageiroId,
+        passageiroNome: data.passageiroNome,
         origem: data.origem,
         destino: data.destino,
+        origemEndereco: data.origemEndereco,
+        destinoEndereco: data.destinoEndereco,
         preco: data.preco,
         status: 'aguardando',
         recusados: []
@@ -156,11 +163,15 @@ function initializeWebSocket(server) {
       motoristasOnline.forEach((motorista, outroId) => {
         if (!motorista.disponivel || motorista.corridaAtual) return;
         if (recusados.includes(outroId)) return;
+        console.log(`Reenviando corrida ${corridaId} para motorista ${outroId}`);
         io.to(motorista.socketId).emit('corrida:novaSolicitacao', {
           corridaId: corrida.corridaId,
           passageiroId: corrida.passageiroId,
+          passageiroNome: corrida.passageiroNome,
           origem: corrida.origem,
           destino: corrida.destino,
+          origemEndereco: corrida.origemEndereco,
+          destinoEndereco: corrida.destinoEndereco,
           preco: corrida.preco
         });
       });
