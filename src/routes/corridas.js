@@ -312,10 +312,18 @@ router.put('/:id/avaliar', async (req, res) => {
 router.put('/:id/avaliar-passageiro', async (req, res) => {
   try {
     const { id } = req.params;
+    if (!req.body) {
+      return res.status(400).json({ error: 'Body obrigatorio' });
+    }
     const { avaliacao, comentario } = req.body;
     const nota = Number(avaliacao);
     if (!Number.isFinite(nota) || nota < 1 || nota > 5) {
       return res.status(400).json({ error: 'Avaliacao invalida' });
+    }
+
+    const corridaExistente = await prisma.corrida.findUnique({ where: { id } });
+    if (!corridaExistente) {
+      return res.status(404).json({ error: 'Corrida nao encontrada' });
     }
 
     const corrida = await prisma.corrida.update({
