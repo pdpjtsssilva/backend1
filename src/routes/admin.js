@@ -219,9 +219,9 @@ router.get('/usuarios/:id/detalhes', async (req, res) => {
         _avg: { avaliacao: true }
       })
       : await prisma.corrida.aggregate({
-        where: { passageiroId: id, avaliacaoPassageiro: { not: null } },
-        _count: { avaliacaoPassageiro: true },
-        _avg: { avaliacaoPassageiro: true }
+        where: { passageiroId: id, avaliacao: { not: null } },
+        _count: { avaliacao: true },
+        _avg: { avaliacao: true }
       });
 
     const ganhosCredito = isMotorista
@@ -247,12 +247,8 @@ router.get('/usuarios/:id/detalhes', async (req, res) => {
       resumo: {
         totalCorridas: corridasResumo._count._all || 0,
         totalFaturado: corridasResumo._sum.preco || 0,
-        totalAvaliacoes: isMotorista
-          ? (avaliacaoResumo._count.avaliacao || 0)
-          : (avaliacaoResumo._count.avaliacaoPassageiro || 0),
-        avaliacaoMedia: isMotorista
-          ? (avaliacaoResumo._avg.avaliacao || 0)
-          : (avaliacaoResumo._avg.avaliacaoPassageiro || 0)
+        totalAvaliacoes: avaliacaoResumo._count.avaliacao || 0,
+        avaliacaoMedia: avaliacaoResumo._avg.avaliacao || 0
       },
       ganhos: {
         creditos,

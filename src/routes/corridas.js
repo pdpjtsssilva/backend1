@@ -224,10 +224,11 @@ router.get('/:id', async (req, res) => {
 router.patch('/:id/cancelar', async (req, res) => {
   try {
     const { id } = req.params;
+    const canceladoPor = req.body?.canceladoPor || null;
 
     const corrida = await prisma.corrida.update({
       where: { id },
-      data: { status: 'cancelada' }
+      data: { status: 'cancelada', canceladoPor }
     });
 
     res.json(corrida);
@@ -306,39 +307,6 @@ router.put('/:id/avaliar', async (req, res) => {
   }
 });
 
-// ========================================
-// AVALIAR PASSAGEIRO (Motorista)
-// ========================================
-router.put('/:id/avaliar-passageiro', async (req, res) => {
-  try {
-    const { id } = req.params;
-    if (!req.body) {
-      return res.status(400).json({ error: 'Body obrigatorio' });
-    }
-    const { avaliacao, comentario } = req.body;
-    const nota = Number(avaliacao);
-    if (!Number.isFinite(nota) || nota < 1 || nota > 5) {
-      return res.status(400).json({ error: 'Avaliacao invalida' });
-    }
-
-    const corridaExistente = await prisma.corrida.findUnique({ where: { id } });
-    if (!corridaExistente) {
-      return res.status(404).json({ error: 'Corrida nao encontrada' });
-    }
-
-    const corrida = await prisma.corrida.update({
-      where: { id },
-      data: {
-        avaliacaoPassageiro: nota,
-        comentarioPassageiro: comentario || null
-      }
-    });
-
-    res.json(corrida);
-  } catch (error) {
-    console.error('Erro ao avaliar passageiro:', error);
-    res.status(500).json({ erro: 'Erro ao avaliar passageiro' });
-  }
-});
+// Avaliacao do passageiro foi desativada (passageiro nao deve ser avaliado).
 
 module.exports = router;
