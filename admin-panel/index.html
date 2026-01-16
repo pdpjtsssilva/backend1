@@ -592,13 +592,14 @@
                       <th>Passageiro</th>
                       <th>Motorista</th>
                       <th>Status</th>
+                      <th>Cancelado por</th>
                       <th>Valor</th>
                       <th>Origem</th>
                       <th>Destino</th>
                     </tr>
                   </thead>
                   <tbody id="corridasBody">
-                    <tr><td colspan="7">Carregando...</td></tr>
+                    <tr><td colspan="8">Carregando...</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -1209,19 +1210,21 @@
         const origem = c.origemEndereco || '-';
         const destino = c.destinoEndereco || '-';
         const status = c.status || '-';
+        const canceladoPor = c.canceladoPor || '-';
         return `
           <tr>
             <td>${formatDate(c.createdAt)}</td>
             <td>${passageiro}</td>
             <td>${motorista}</td>
             <td><span class="badge ${statusBadgeClass(status)}">${status}</span></td>
+            <td>${canceladoPor}</td>
             <td>${formatMoney(c.preco)}</td>
             <td>${origem}</td>
             <td>${destino}</td>
           </tr>
         `;
       }).join('');
-      tbody.innerHTML = rows || '<tr><td colspan="7">Nenhuma corrida encontrada</td></tr>';
+      tbody.innerHTML = rows || '<tr><td colspan="8">Nenhuma corrida encontrada</td></tr>';
       const stats = qs('#corridasStats');
       if (stats) {
         stats.textContent = `${corridas.length} corridas recentes`;
@@ -1500,6 +1503,7 @@
   </script>
 </body>
 </html>
+
 
 
 

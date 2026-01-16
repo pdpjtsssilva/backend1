@@ -54,6 +54,7 @@ model Corrida {
   preco            Float
   status           String   @default("aguardando") // aguardando, aceita, em_andamento, finalizada, cancelada, paga
   metodoPagamento  String?  // cartao, carteira, dinheiro
+  canceladoPor     String?  // passageiro, motorista, admin
   avaliacao        Int?
   comentarioAvaliacao String?
   avaliacaoPassageiro Int?
