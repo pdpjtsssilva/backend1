@@ -46,7 +46,19 @@ function initializeWebSocket(server) {
       if (snapshot) {
         emitAdmin('admin:motoristaOnline', snapshot);
       }
-      // Nao reenviamos corridas pendentes; apenas motoristas online recebem novas solicitacoes.
+      // Reenvia corridas pendentes para motoristas que entram online.
+      corridasAtivas.forEach((corrida) => {
+        if (!corrida || corrida.status !== 'aguardando') return;
+        const recusados = Array.isArray(corrida.recusados) ? corrida.recusados : [];
+        if (recusados.includes(motoristaId)) return;
+        io.to(socket.id).emit('corrida:novaSolicitacao', {
+          corridaId: corrida.corridaId,
+          passageiroId: corrida.passageiroId,
+          origem: corrida.origem,
+          destino: corrida.destino,
+          preco: corrida.preco
+        });
+      });
     });
 
     // MOTORISTA: Ficar offline
