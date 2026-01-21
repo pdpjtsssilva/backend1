@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Painel Admin - Uber Clone</title>
+  <title>Painel Admin v2.0 🚗 - Uber Clone</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -228,14 +228,16 @@
     }
 
     .marker {
-      width: 14px;
-      height: 14px;
-      border-radius: 999px;
-      border: 2px solid #0b1220;
-      box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.15);
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
     }
-    .marker.online { background: var(--ok); }
-    .marker.offline { background: var(--offline); }
+    .marker.online { color: var(--ok); }
+    .marker.offline { color: var(--offline); }
     .comment-cell {
       white-space: normal;
       word-break: break-word;
@@ -256,6 +258,7 @@
     .kpi-title { font-size: 12px; color: var(--muted); }
     .kpi-value { font-size: 22px; font-weight: 700; margin-top: 6px; }
     .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    console.log("🚗 PAINEL ADMIN v2.0 - COM CARRINHOS SVG");
     .chart {
       display: flex;
       align-items: flex-end;
@@ -379,6 +382,7 @@
     crossorigin=""
   ></script>
   <script>
+    console.log("🚗🚗🚗 PAINEL ADMIN v2.0 - CARRINHOS SVG ATIVADOS 🚗🚗🚗");
     const apiBase = '/api/admin';
     let authHeader = null;
     let map = null;
@@ -680,12 +684,12 @@
     }
 
     function createMarkerIcon(status) {
-      const cls = status === 'online' ? 'online' : 'offline';
+      const color = status === 'online' ? '#22c55e' : '#64748b';
       return L.divIcon({
         className: '',
-        html: `<div class="marker ${cls}"></div>`,
-        iconSize: [14, 14],
-        iconAnchor: [7, 7]
+        html: `<svg width="24" height="24" viewBox="0 0 24 24" fill="${color}" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
       });
     }
 
