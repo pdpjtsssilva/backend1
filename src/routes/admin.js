@@ -1,9 +1,24 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
+const Stripe = require('stripe');
 const { motoristasOnline } = require('../websocket');
 
 const router = express.Router();
 const prisma = new PrismaClient();
+const stripeKey = process.env.STRIPE_SECRET_KEY || '';
+const stripe = stripeKey ? new Stripe(stripeKey, { apiVersion: '2023-10-16' }) : null;
+
+async function ensureCarteira(userId) {
+  const usuario = await prisma.user.findUnique({ where: { id: userId } });
+  if (!usuario) {
+    throw new Error('Usuario nao encontrado para carteira');
+  }
+  let carteira = await prisma.carteira.findUnique({ where: { userId } });
+  if (!carteira) {
+    carteira = await prisma.carteira.create({ data: { userId, saldo: 0 } });
+  }
+  return carteira;
+}
 
 // Middleware de auth basico para admin
 const adminUser = process.env.ADMIN_USER || 'admin';
@@ -312,8 +327,33 @@ router.get('/corridas', async (req, res) => {
 // Listar transacoes (pagamentos) para o painel admin
 router.get('/transacoes', async (req, res) => {
   try {
-    const { tipo, limit = 50 } = req.query;
-    const where = tipo ? { tipo } : {};
+    const { tipo, limit = 50, startDate, endDate, metodo, status, categoria, search } = req.query;
+    const filters = [];
+    if (tipo) filters.push({ tipo });
+    if (metodo) filters.push({ metodoPagamento: metodo });
+    if (status) filters.push({ status });
+    if (categoria) filters.push({ categoria });
+    if (startDate || endDate) {
+      const createdAt = {};
+      if (startDate) createdAt.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        createdAt.lte = end;
+      }
+      filters.push({ createdAt });
+    }
+    if (search) {
+      filters.push({
+        OR: [
+          { descricao: { contains: search, mode: 'insensitive' } },
+          { referencia: { contains: search, mode: 'insensitive' } },
+          { usuario: { nome: { contains: search, mode: 'insensitive' } } },
+          { usuario: { email: { contains: search, mode: 'insensitive' } } }
+        ]
+      });
+    }
+    const where = filters.length ? { AND: filters } : {};
     const transacoes = await prisma.transacao.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -328,6 +368,184 @@ router.get('/transacoes', async (req, res) => {
   } catch (error) {
     console.error('Erro ao listar transacoes:', error);
     res.status(500).json({ erro: 'Erro ao listar transacoes' });
+  }
+});
+
+router.get('/transacoes/export', async (req, res) => {
+  try {
+    const { tipo, startDate, endDate, metodo, status, categoria, search } = req.query;
+    const filters = [];
+    if (tipo) filters.push({ tipo });
+    if (metodo) filters.push({ metodoPagamento: metodo });
+    if (status) filters.push({ status });
+    if (categoria) filters.push({ categoria });
+    if (startDate || endDate) {
+      const createdAt = {};
+      if (startDate) createdAt.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        createdAt.lte = end;
+      }
+      filters.push({ createdAt });
+    }
+    if (search) {
+      filters.push({
+        OR: [
+          { descricao: { contains: search, mode: 'insensitive' } },
+          { referencia: { contains: search, mode: 'insensitive' } },
+          { usuario: { nome: { contains: search, mode: 'insensitive' } } },
+          { usuario: { email: { contains: search, mode: 'insensitive' } } }
+        ]
+      });
+    }
+    const where = filters.length ? { AND: filters } : {};
+    const transacoes = await prisma.transacao.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        usuario: {
+          select: { id: true, nome: true, email: true, telefone: true }
+        }
+      }
+    });
+
+    const header = [
+      'data',
+      'usuario',
+      'email',
+      'tipo',
+      'categoria',
+      'metodo',
+      'status',
+      'valor',
+      'descricao',
+      'referencia'
+    ];
+    const rows = transacoes.map((t) => [
+      t.createdAt?.toISOString() || '',
+      t.usuario?.nome || '',
+      t.usuario?.email || '',
+      t.tipo || '',
+      t.categoria || '',
+      t.metodoPagamento || '',
+      t.status || '',
+      t.valor != null ? t.valor : '',
+      t.descricao || '',
+      t.referencia || ''
+    ]);
+
+    const csv = [header, ...rows]
+      .map((line) => line.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="transacoes.csv"');
+    res.send(csv);
+  } catch (error) {
+    console.error('Erro ao exportar transacoes:', error);
+    res.status(500).json({ erro: 'Erro ao exportar transacoes' });
+  }
+});
+
+router.get('/financeiro/resumo', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const createdAt = {};
+    if (startDate) createdAt.gte = new Date(startDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      createdAt.lte = end;
+    }
+    const where = Object.keys(createdAt).length ? { createdAt } : {};
+
+    const [total, comissao, reembolsos] = await Promise.all([
+      prisma.transacao.aggregate({
+        where,
+        _sum: { valor: true },
+        _count: { _all: true }
+      }),
+      prisma.transacao.aggregate({
+        where: { ...where, categoria: 'comissao' },
+        _sum: { valor: true }
+      }),
+      prisma.transacao.aggregate({
+        where: { ...where, categoria: 'reembolso' },
+        _sum: { valor: true }
+      })
+    ]);
+
+    res.json({
+      totalTransacoes: total._count._all || 0,
+      totalValor: total._sum.valor || 0,
+      totalComissao: comissao._sum.valor || 0,
+      totalReembolsos: reembolsos._sum.valor || 0
+    });
+  } catch (error) {
+    console.error('Erro ao carregar resumo financeiro:', error);
+    res.status(500).json({ erro: 'Erro ao carregar resumo financeiro' });
+  }
+});
+
+router.post('/reembolsos', async (req, res) => {
+  try {
+    const { transacaoId, motivo } = req.body;
+    if (!transacaoId) {
+      return res.status(400).json({ erro: 'transacaoId obrigatorio' });
+    }
+    const transacao = await prisma.transacao.findUnique({
+      where: { id: transacaoId },
+      include: { usuario: true }
+    });
+    if (!transacao) {
+      return res.status(404).json({ erro: 'Transacao nao encontrada' });
+    }
+    if (transacao.status === 'reembolsada') {
+      return res.status(400).json({ erro: 'Transacao ja reembolsada' });
+    }
+
+    const metodo = transacao.metodoPagamento || 'cartao';
+    if (metodo === 'carteira') {
+      const carteira = await ensureCarteira(transacao.userId);
+      const novoSaldo = carteira.saldo + transacao.valor;
+      await prisma.carteira.update({ where: { userId: transacao.userId }, data: { saldo: novoSaldo } });
+    } else if (metodo === 'cartao') {
+      if (!stripe) {
+        return res.status(501).json({ erro: 'Stripe nao configurado' });
+      }
+      if (!transacao.gatewayId) {
+        return res.status(400).json({ erro: 'GatewayId ausente para reembolso' });
+      }
+      await stripe.refunds.create({ payment_intent: transacao.gatewayId });
+    } else {
+      return res.status(400).json({ erro: 'Reembolso manual necessario para dinheiro' });
+    }
+
+    await prisma.transacao.update({
+      where: { id: transacaoId },
+      data: { status: 'reembolsada' }
+    });
+
+    const reembolso = await prisma.transacao.create({
+      data: {
+        userId: transacao.userId,
+        tipo: 'credito',
+        valor: transacao.valor,
+        descricao: `Reembolso ${transacao.referencia || transacao.id}${motivo ? ` - ${motivo}` : ''}`,
+        categoria: 'reembolso',
+        metodoPagamento: metodo,
+        status: 'aprovada',
+        referencia: transacao.referencia || transacao.id,
+        saldoAnterior: null,
+        saldoNovo: null
+      }
+    });
+
+    res.json({ mensagem: 'Reembolso processado', reembolso });
+  } catch (error) {
+    console.error('Erro ao processar reembolso:', error);
+    res.status(500).json({ erro: 'Erro ao processar reembolso' });
   }
 });
 

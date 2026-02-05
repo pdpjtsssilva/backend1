@@ -147,6 +147,10 @@ router.post('/carteira/adicionar', async (req, res) => {
         tipo: 'credito',
         valor: valorNumero,
         descricao: `Recarga via ${metodoPagamento || 'cartao'}`,
+        categoria: 'recarga',
+        metodoPagamento: metodoPagamento || 'cartao',
+        status: 'aprovada',
+        gatewayId: intent.id,
         saldoAnterior: carteira.saldo - valorNumero,
         saldoNovo: novoSaldo
       }
@@ -185,6 +189,48 @@ router.post('/pagar', async (req, res) => {
     const liquidoMotorista = valorNumero - comissao;
 
     if (metodoPagamento === 'carteira' || metodoPagamento === 'dinheiro') {
+      if (metodoPagamento === 'carteira') {
+        let carteiraPassageiro;
+        try {
+          carteiraPassageiro = await ensureCarteira(userId);
+        } catch (err) {
+          return res.status(404).json({ erro: 'Passageiro nao encontrado' });
+        }
+        if (carteiraPassageiro.saldo < valorNumero) {
+          return res.status(400).json({ erro: 'Saldo insuficiente na carteira' });
+        }
+        const novoSaldoPassageiro = carteiraPassageiro.saldo - valorNumero;
+        await prisma.carteira.update({ where: { userId }, data: { saldo: novoSaldoPassageiro } });
+        await prisma.transacao.create({
+          data: {
+            userId,
+            tipo: 'debito',
+            valor: valorNumero,
+            descricao: `Pagamento corrida #${corridaId} via carteira`,
+            categoria: 'pagamento',
+            metodoPagamento: 'carteira',
+            status: 'aprovada',
+            referencia: corridaId,
+            saldoAnterior: carteiraPassageiro.saldo,
+            saldoNovo: novoSaldoPassageiro
+          }
+        });
+      } else {
+        await prisma.transacao.create({
+          data: {
+            userId,
+            tipo: 'debito',
+            valor: valorNumero,
+            descricao: `Pagamento corrida #${corridaId} em dinheiro`,
+            categoria: 'pagamento',
+            metodoPagamento: 'dinheiro',
+            status: 'aprovada',
+            referencia: corridaId,
+            saldoAnterior: null,
+            saldoNovo: null
+          }
+        });
+      }
       // Debita comissao do motorista (para corridas em dinheiro ou se optar pagar via carteira)
       let carteira;
       try {
@@ -203,6 +249,10 @@ router.post('/pagar', async (req, res) => {
           tipo: 'debito',
           valor: comissao,
           descricao: `Comissao corrida #${corridaId} (dinheiro/carteira)`,
+          categoria: 'comissao',
+          metodoPagamento: metodoPagamento || 'dinheiro',
+          status: 'aprovada',
+          referencia: corridaId,
           saldoAnterior: carteira.saldo,
           saldoNovo: novoSaldo
         }
@@ -228,6 +278,22 @@ router.post('/pagar', async (req, res) => {
         return res.status(402).json({ erro: 'Pagamento nao autorizado', status: intent.status, clientSecret: intent.client_secret });
       }
 
+      await prisma.transacao.create({
+        data: {
+          userId,
+          tipo: 'debito',
+          valor: valorNumero,
+          descricao: `Pagamento corrida #${corridaId} via ${metodoPagamento || 'cartao'}`,
+          categoria: 'pagamento',
+          metodoPagamento: metodoPagamento || 'cartao',
+          status: 'aprovada',
+          referencia: corridaId,
+          gatewayId: intent.id,
+          saldoAnterior: null,
+          saldoNovo: null
+        }
+      });
+
       // Registrar comissao (log) e credito liquido (log) para o motorista
       await prisma.transacao.create({
         data: {
@@ -235,6 +301,10 @@ router.post('/pagar', async (req, res) => {
           tipo: 'debito',
           valor: comissao,
           descricao: `Comissao corrida #${corridaId} via ${metodoPagamento || 'cartao'}`,
+          categoria: 'comissao',
+          metodoPagamento: metodoPagamento || 'cartao',
+          status: 'aprovada',
+          referencia: corridaId,
           saldoAnterior: null,
           saldoNovo: null
         }
@@ -245,6 +315,10 @@ router.post('/pagar', async (req, res) => {
           tipo: 'credito',
           valor: liquidoMotorista,
           descricao: `Credito liquido corrida #${corridaId}`,
+          categoria: 'repasse',
+          metodoPagamento: metodoPagamento || 'cartao',
+          status: 'aprovada',
+          referencia: corridaId,
           saldoAnterior: null,
           saldoNovo: null
         }

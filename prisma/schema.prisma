@@ -124,6 +124,11 @@ model Transacao {
   tipo          String   // credito ou debito
   valor         Float
   descricao     String
+  categoria     String?  // recarga, pagamento, comissao, repasse, reembolso
+  metodoPagamento String? // cartao, carteira, dinheiro
+  status        String   @default("aprovada") // aprovada, pendente, reembolsada
+  referencia    String?  // corridaId ou outro
+  gatewayId     String?  // payment intent, etc
   saldoAnterior Float
   saldoNovo     Float
   createdAt     DateTime @default(now())

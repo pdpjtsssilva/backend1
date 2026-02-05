@@ -24,6 +24,16 @@ function snapshotMotorista(motoristaId) {
   };
 }
 
+function listarMotoristasOnline() {
+  return Array.from(motoristasOnline.entries()).map(([motoristaId, data]) => ({
+    motoristaId,
+    nome: data.nome,
+    localizacao: data.localizacao || null,
+    disponivel: data.disponivel,
+    corridaAtual: data.corridaAtual || null
+  }));
+}
+
 function emitirNovaSolicitacaoParaMotoristas(data) {
   if (!io || !data?.corridaId || corridasAtivas.has(data.corridaId)) return;
   const passageiroSocket = passageirosOnline.get(data.passageiroId) || null;
@@ -79,6 +89,7 @@ function initializeWebSocket(server) {
       const snapshot = snapshotMotorista(motoristaId);
       if (snapshot) {
         emitAdmin('admin:motoristaOnline', snapshot);
+        io.emit('motorista:online', snapshot);
       }
       // Reenvia corridas pendentes para motoristas que entram online.
       corridasAtivas.forEach((corrida) => {
@@ -103,6 +114,7 @@ function initializeWebSocket(server) {
     socket.on('passageiro:entrar', ({ passageiroId }) => {
       if (!passageiroId) return;
       passageirosOnline.set(passageiroId, socket.id);
+      io.to(socket.id).emit('motoristas:online', listarMotoristasOnline());
     });
 
     // MOTORISTA: Ficar offline
@@ -112,6 +124,7 @@ function initializeWebSocket(server) {
         motoristasOnline.delete(motoristaId);
         console.log(`Motorista ${motoristaId} ficou offline`);
         emitAdmin('admin:motoristaOffline', snapshot || { motoristaId });
+        io.emit('motorista:offline', { motoristaId });
       }
     });
 
@@ -289,6 +302,10 @@ function initializeWebSocket(server) {
         motorista.localizacao = { latitude, longitude };
         motoristasOnline.set(motoristaId, motorista);
         emitAdmin('admin:motoristaPosicao', {
+          motoristaId,
+          localizacao: { latitude, longitude }
+        });
+        io.emit('motorista:posicaoOnline', {
           motoristaId,
           localizacao: { latitude, longitude }
         });
