@@ -119,6 +119,7 @@ function initializeWebSocket(server) {
     // PASSAGEIRO: Registrar socket
     socket.on('passageiro:entrar', ({ passageiroId }) => {
       if (!passageiroId) return;
+      console.log(`Passageiro ${passageiroId} conectado`);
       passageirosOnline.set(passageiroId, socket.id);
       io.to(socket.id).emit('motoristas:online', listarMotoristasOnline());
     });
@@ -136,7 +137,7 @@ function initializeWebSocket(server) {
 
     // PASSAGEIRO: Solicitar corrida
     socket.on('passageiro:solicitarCorrida', (data) => {
-      console.log('Nova corrida solicitada:', data.corridaId);
+      console.log('Nova corrida solicitada (socket):', data.corridaId);
       if (corridasAtivas.has(data.corridaId)) return;
       passageirosOnline.set(data.passageiroId, socket.id);
       corridasAtivas.set(data.corridaId, {

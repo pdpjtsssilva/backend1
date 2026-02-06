@@ -25,6 +25,7 @@ router.post('/solicitar', async (req, res) => {
     if (!passageiroId || !origemLat || !origemLng || !destinoLat || !destinoLng) {
       return res.status(400).json({ erro: 'Dados incompletos' });
     }
+    console.log('Nova corrida solicitada (HTTP):', { passageiroId });
 
     // Calcular distância aproximada (Haversine)
     const R = 6371;
