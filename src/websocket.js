@@ -37,7 +37,7 @@ function listarMotoristasOnline() {
 function emitirNovaSolicitacaoParaMotoristas(data) {
   if (!io || !data?.corridaId || corridasAtivas.has(data.corridaId)) return;
   const passageiroSocket = passageirosOnline.get(data.passageiroId) || null;
-  corridasAtivas.set(data.corridaId, {
+  const corridaPayload = {
     corridaId: data.corridaId,
     passageiroSocket,
     passageiroId: data.passageiroId,
@@ -49,7 +49,8 @@ function emitirNovaSolicitacaoParaMotoristas(data) {
     preco: data.preco,
     status: 'aguardando',
     recusados: []
-  });
+  };
+  corridasAtivas.set(data.corridaId, corridaPayload);
 
   emitAdmin('admin:corridaNova', {
     corridaId: data.corridaId,
@@ -61,13 +62,14 @@ function emitirNovaSolicitacaoParaMotoristas(data) {
   });
 
   let enviados = 0;
+  const solicitacao = { ...data, recusados: corridaPayload.recusados };
   motoristasOnline.forEach((motorista) => {
     if (motorista.disponivel && !motorista.corridaAtual) {
-      io.to(motorista.socketId).emit('corrida:novaSolicitacao', data);
+      io.to(motorista.socketId).emit('corrida:novaSolicitacao', solicitacao);
       enviados += 1;
     }
   });
-  io.emit('corrida:novaSolicitacao', data);
+  io.emit('corrida:novaSolicitacao', solicitacao);
 }
 
 function initializeWebSocket(server) {
@@ -229,21 +231,24 @@ function initializeWebSocket(server) {
         });
       }
 
+      const solicitacao = {
+        corridaId: corrida.corridaId,
+        passageiroId: corrida.passageiroId,
+        passageiroNome: corrida.passageiroNome,
+        origem: corrida.origem,
+        destino: corrida.destino,
+        origemEndereco: corrida.origemEndereco,
+        destinoEndereco: corrida.destinoEndereco,
+        preco: corrida.preco,
+        recusados
+      };
       motoristasOnline.forEach((motorista, outroId) => {
         if (!motorista.disponivel || motorista.corridaAtual) return;
         if (recusados.includes(outroId)) return;
         console.log(`Reenviando corrida ${corridaId} para motorista ${outroId}`);
-        io.to(motorista.socketId).emit('corrida:novaSolicitacao', {
-          corridaId: corrida.corridaId,
-          passageiroId: corrida.passageiroId,
-          passageiroNome: corrida.passageiroNome,
-          origem: corrida.origem,
-          destino: corrida.destino,
-          origemEndereco: corrida.origemEndereco,
-          destinoEndereco: corrida.destinoEndereco,
-          preco: corrida.preco
-        });
+        io.to(motorista.socketId).emit('corrida:novaSolicitacao', solicitacao);
       });
+      io.emit('corrida:novaSolicitacao', solicitacao);
     });
 
     // MOTORISTA: Chegou na origem
