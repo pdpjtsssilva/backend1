@@ -34,6 +34,42 @@ function listarMotoristasOnline() {
   }));
 }
 
+function selecionarProximoMotorista(corrida) {
+  if (!corrida) return null;
+  const recusados = Array.isArray(corrida.recusados) ? corrida.recusados : [];
+  const oferecidos = Array.isArray(corrida.oferecidos) ? corrida.oferecidos : [];
+  for (const [motoristaId, motorista] of motoristasOnline.entries()) {
+    if (!motorista?.disponivel || motorista?.corridaAtual) continue;
+    if (recusados.includes(motoristaId)) continue;
+    if (oferecidos.includes(motoristaId)) continue;
+    return { motoristaId, motorista };
+  }
+  return null;
+}
+
+function enviarParaProximoMotorista(corrida) {
+  if (!io || !corrida?.corridaId) return;
+  const escolhido = selecionarProximoMotorista(corrida);
+  if (!escolhido) return;
+  const { motoristaId, motorista } = escolhido;
+  const oferecidos = Array.isArray(corrida.oferecidos) ? corrida.oferecidos : [];
+  oferecidos.push(motoristaId);
+  corridasAtivas.set(corrida.corridaId, { ...corrida, oferecidos });
+  const solicitacao = {
+    corridaId: corrida.corridaId,
+    passageiroId: corrida.passageiroId,
+    passageiroNome: corrida.passageiroNome,
+    origem: corrida.origem,
+    destino: corrida.destino,
+    origemEndereco: corrida.origemEndereco,
+    destinoEndereco: corrida.destinoEndereco,
+    preco: corrida.preco,
+    recusados: corrida.recusados || []
+  };
+  io.to(motorista.socketId).emit('corrida:novaSolicitacao', solicitacao);
+  console.log(`Corrida ${corrida.corridaId} enviada para motorista ${motoristaId}`);
+}
+
 function emitirNovaSolicitacaoParaMotoristas(data) {
   if (!io || !data?.corridaId || corridasAtivas.has(data.corridaId)) return;
   const passageiroSocket = passageirosOnline.get(data.passageiroId) || null;
@@ -48,7 +84,8 @@ function emitirNovaSolicitacaoParaMotoristas(data) {
     destinoEndereco: data.destinoEndereco,
     preco: data.preco,
     status: 'aguardando',
-    recusados: []
+    recusados: [],
+    oferecidos: []
   };
   corridasAtivas.set(data.corridaId, corridaPayload);
 
@@ -61,15 +98,7 @@ function emitirNovaSolicitacaoParaMotoristas(data) {
     status: 'aguardando'
   });
 
-  let enviados = 0;
-  const solicitacao = { ...data, recusados: corridaPayload.recusados };
-  motoristasOnline.forEach((motorista) => {
-    if (motorista.disponivel && !motorista.corridaAtual) {
-      io.to(motorista.socketId).emit('corrida:novaSolicitacao', solicitacao);
-      enviados += 1;
-    }
-  });
-  io.emit('corrida:novaSolicitacao', solicitacao);
+  enviarParaProximoMotorista(corridaPayload);
 }
 
 function initializeWebSocket(server) {
@@ -101,17 +130,8 @@ function initializeWebSocket(server) {
         if (!corrida || corrida.status !== 'aguardando') return;
         const recusados = Array.isArray(corrida.recusados) ? corrida.recusados : [];
         if (recusados.includes(motoristaId)) return;
-        console.log(`Reenviando corrida pendente ${corrida.corridaId} para motorista ${motoristaId}`);
-        io.to(socket.id).emit('corrida:novaSolicitacao', {
-          corridaId: corrida.corridaId,
-          passageiroId: corrida.passageiroId,
-          passageiroNome: corrida.passageiroNome,
-          origem: corrida.origem,
-          destino: corrida.destino,
-          origemEndereco: corrida.origemEndereco,
-          destinoEndereco: corrida.destinoEndereco,
-          preco: corrida.preco
-        });
+        console.log(`Motorista ${motoristaId} entrou online; tentando enviar corrida ${corrida.corridaId}`);
+        enviarParaProximoMotorista(corrida);
       });
     });
 
@@ -212,7 +232,8 @@ function initializeWebSocket(server) {
 
       const recusados = Array.isArray(corrida.recusados) ? corrida.recusados : [];
       if (!recusados.includes(motoristaId)) recusados.push(motoristaId);
-      corridasAtivas.set(corridaId, { ...corrida, recusados, status: 'aguardando' });
+      const atualizado = { ...corrida, recusados, status: 'aguardando' };
+      corridasAtivas.set(corridaId, atualizado);
 
       prisma.corrida.update({
         where: { id: corridaId },
@@ -231,24 +252,7 @@ function initializeWebSocket(server) {
         });
       }
 
-      const solicitacao = {
-        corridaId: corrida.corridaId,
-        passageiroId: corrida.passageiroId,
-        passageiroNome: corrida.passageiroNome,
-        origem: corrida.origem,
-        destino: corrida.destino,
-        origemEndereco: corrida.origemEndereco,
-        destinoEndereco: corrida.destinoEndereco,
-        preco: corrida.preco,
-        recusados
-      };
-      motoristasOnline.forEach((motorista, outroId) => {
-        if (!motorista.disponivel || motorista.corridaAtual) return;
-        if (recusados.includes(outroId)) return;
-        console.log(`Reenviando corrida ${corridaId} para motorista ${outroId}`);
-        io.to(motorista.socketId).emit('corrida:novaSolicitacao', solicitacao);
-      });
-      io.emit('corrida:novaSolicitacao', solicitacao);
+      enviarParaProximoMotorista(atualizado);
     });
 
     // MOTORISTA: Chegou na origem
