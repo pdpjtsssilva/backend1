@@ -67,10 +67,7 @@ function emitirNovaSolicitacaoParaMotoristas(data) {
       enviados += 1;
     }
   });
-
-  if (enviados === 0) {
-    io.emit('corrida:novaSolicitacao', data);
-  }
+  io.emit('corrida:novaSolicitacao', data);
 }
 
 function initializeWebSocket(server) {
