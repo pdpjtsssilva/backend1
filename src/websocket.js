@@ -60,11 +60,17 @@ function emitirNovaSolicitacaoParaMotoristas(data) {
     status: 'aguardando'
   });
 
+  let enviados = 0;
   motoristasOnline.forEach((motorista) => {
     if (motorista.disponivel && !motorista.corridaAtual) {
       io.to(motorista.socketId).emit('corrida:novaSolicitacao', data);
+      enviados += 1;
     }
   });
+
+  if (enviados === 0) {
+    io.emit('corrida:novaSolicitacao', data);
+  }
 }
 
 function initializeWebSocket(server) {
