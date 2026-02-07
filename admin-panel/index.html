@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+﻿ï»¿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Painel Admin v2.0 ðŸš— - Uber Clone</title>
+  <title>Painel Admin v2.0 Ã°Å¸Å¡â€” - Uber Clone</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -413,7 +413,7 @@
       if (!value) return '-';
       const text = `${value}`;
       if (text.length <= max) return text;
-      return `${text.slice(0, max - 1)}â€¦`;
+      return `${text.slice(0, max - 1)}Ã¢â‚¬Â¦`;
     };
 
     const statusBadgeClass = (status) => {
@@ -457,10 +457,14 @@
       authHeader = 'Basic ' + btoa(u + ':' + p);
       localStorage.setItem('adminAuth', authHeader);
       setStatus('Admin logado');
-      await initDashboard();
+      try {
+        await initDashboard();
+      } catch (err) {
+        console.error(err);
+        renderLogin();
+      }
     }
-
-    function renderDashboard() {
+function renderDashboard() {
       app.innerHTML = `
         <div class="layout">
           <aside class="card sidebar">
@@ -1162,12 +1166,12 @@
         <div class="kpi-card">
           <div class="kpi-title">Usuarios</div>
           <div class="kpi-value">${usuarios.total || 0}</div>
-          <div class="kpi-sub">${usuarios.passageiros || 0} passageiros â€¢ ${usuarios.motoristas || 0} motoristas</div>
+          <div class="kpi-sub">${usuarios.passageiros || 0} passageiros Ã¢â‚¬Â¢ ${usuarios.motoristas || 0} motoristas</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-title">Corridas</div>
           <div class="kpi-value">${corridasData.hoje || 0}</div>
-          <div class="kpi-sub">${corridasData.semana || 0} semana â€¢ ${corridasData.mes || 0} mes</div>
+          <div class="kpi-sub">${corridasData.semana || 0} semana Ã¢â‚¬Â¢ ${corridasData.mes || 0} mes</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-title">Receita</div>
@@ -1474,8 +1478,16 @@
 
     async function initDashboard() {
       renderDashboard();
-      initMap();
-      connectSocket();
+      try {
+        initMap();
+      } catch (err) {
+        console.warn('Mapa indisponivel', err);
+      }
+      try {
+        connectSocket();
+      } catch (err) {
+        console.warn('Socket indisponivel', err);
+      }
       try {
         await loadMotoristas();
         await loadOnline();
@@ -1496,19 +1508,21 @@
         }, 15000);
       } catch (err) {
         console.error(err);
-        app.innerHTML = `<div class="card">Erro ao carregar dados</div>`;
+        app.innerHTML = '<div class="card">Erro ao carregar dados</div>';
       }
     }
 
-    const saved = localStorage.getItem('adminAuth');
+    renderLogin();
+const saved = localStorage.getItem('adminAuth');
     if (saved) {
       authHeader = saved;
       setStatus('Admin logado');
-      initDashboard();
-    } else {
-      renderLogin();
+      initDashboard().catch((err) => {
+        console.error(err);
+        renderLogin();
+      });
     }
-  </script>
+</script>
 </body>
 </html>
 
