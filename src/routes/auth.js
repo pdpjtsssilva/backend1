@@ -1,23 +1,31 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'defina_JWT_SECRET_no_env'; // Em produção, configure via .env
+const JWT_SECRET = process.env.JWT_SECRET || 'defina_JWT_SECRET_no_env'; // Em produÃ§Ã£o, configure via .env
 const SIGNUP_TOKEN = process.env.SIGNUP_TOKEN || ''; // Token para restringir cadastro (opcional)
 
 // Cadastro
 router.post('/cadastro', async (req, res) => {
   try {
     const { nome, email, senha, telefone, tipo, documento, signupToken } = req.body || {};
-    if (typeof email !== 'string' || typeof senha !== 'string' || typeof nome !== 'string') {
-      return res.status(400).json({ error: 'Nome, email e senha s�o obrigat�rios' });
+    const emailLimpo = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const senhaLimpa = typeof senha === 'string' ? senha.trim() : '';
+    const nomeLimpo = typeof nome === 'string' ? nome.trim() : '';
+    if (!emailLimpo || !senhaLimpa || !nomeLimpo) {
+      return res.status(400).json({ error: 'Nome, email e senha são obrigatórios' });
     }
-    const emailLimpo = email.trim().toLowerCase();
-    if (!emailLimpo || !senha.trim() || !nome.trim()) {
-      return res.status(400).json({ error: 'Nome, email e senha s�o obrigat�rios' });
+    if (process.env.DEBUG_AUTH === '1') {
+      console.log('AUTH cadastro payload', {
+        hasBody: !!req.body,
+        keys: req.body ? Object.keys(req.body) : [],
+        emailType: typeof email,
+        senhaType: typeof senha,
+        nomeType: typeof nome
+      });
     }
 
     // Se SIGNUP_TOKEN estiver definido no .env, exigir token de convite
@@ -25,11 +33,11 @@ router.post('/cadastro', async (req, res) => {
       const tokenHeader = req.headers['x-signup-token'];
       const provided = signupToken || tokenHeader;
       if (provided !== SIGNUP_TOKEN) {
-        return res.status(403).json({ error: 'Cadastro bloqueado. Token inv�lido ou ausente.' });
+        return res.status(403).json({ error: 'Cadastro bloqueado. Token inválido ou ausente.' });
       }
     }
 
-    // Verificar se email j� existe
+    // Verificar se email já existe
     const usuarioExistente = await prisma.user.findUnique({
       where: { email: emailLimpo }
     });
@@ -50,7 +58,7 @@ router.post('/cadastro', async (req, res) => {
     // Hash da senha
     const senhaHash = await bcrypt.hash(senha, 10);
 
-    // Criar usu�rio
+    // Criar usuário
     const usuario = await prisma.user.create({
       data: {
         nome,
@@ -101,15 +109,21 @@ router.post('/cadastro', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, senha } = req.body || {};
-    if (typeof email !== 'string' || typeof senha !== 'string') {
-      return res.status(400).json({ error: 'Email e senha s�o obrigat�rios' });
+    const emailLimpo = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const senhaLimpa = typeof senha === 'string' ? senha.trim() : '';
+    if (!emailLimpo || !senhaLimpa) {
+      return res.status(400).json({ error: 'Email e senha são obrigatórios' });
     }
-    const emailLimpo = email.trim().toLowerCase();
-    if (!emailLimpo || !senha.trim()) {
-      return res.status(400).json({ error: 'Email e senha s�o obrigat�rios' });
+    if (process.env.DEBUG_AUTH === '1') {
+      console.log('AUTH login payload', {
+        hasBody: !!req.body,
+        keys: req.body ? Object.keys(req.body) : [],
+        emailType: typeof email,
+        senhaType: typeof senha
+      });
     }
 
-    // Buscar usu�rio
+    // Buscar usuário
     const usuario = await prisma.user.findUnique({
       where: { email: emailLimpo }
     });
@@ -170,7 +184,7 @@ router.get('/verificar', async (req, res) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
 
     if (!token) {
-      return res.status(401).json({ error: 'Token não fornecido' });
+      return res.status(401).json({ error: 'Token nÃ£o fornecido' });
     }
 
     const decoded = jwt.verify(token, JWT_SECRET);
@@ -180,7 +194,7 @@ router.get('/verificar', async (req, res) => {
     });
 
     if (!usuario) {
-      return res.status(401).json({ error: 'Usuário não encontrado' });
+      return res.status(401).json({ error: 'UsuÃ¡rio nÃ£o encontrado' });
     }
 
     res.json({
@@ -199,18 +213,18 @@ router.get('/verificar', async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(401).json({ error: 'Token inválido' });
+    res.status(401).json({ error: 'Token invÃ¡lido' });
   }
 });
 
-// Atualizar perfil básico
+// Atualizar perfil bÃ¡sico
 router.put('/atualizar/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { nome, email, telefone, documento } = req.body;
 
     if (!nome || !email) {
-      return res.status(400).json({ erro: 'Nome e email são obrigatórios' });
+      return res.status(400).json({ erro: 'Nome e email sÃ£o obrigatÃ³rios' });
     }
 
     // Garantir unicidade do email
