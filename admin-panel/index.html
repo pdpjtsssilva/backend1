@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Painel Admin v2.0 🚗 - Uber Clone</title>
+  <title>Painel Admin v2.0 ðŸš— - Uber Clone</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -257,9 +257,7 @@
     }
     .kpi-title { font-size: 12px; color: var(--muted); }
     .kpi-value { font-size: 22px; font-weight: 700; margin-top: 6px; }
-    .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
-    console.log("🚗 PAINEL ADMIN v2.0 - COM CARRINHOS SVG");
-    .chart {
+    .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }\r\n.chart {
       display: flex;
       align-items: flex-end;
       gap: 6px;
@@ -381,9 +379,7 @@
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
     crossorigin=""
   ></script>
-  <script>
-    console.log("🚗🚗🚗 PAINEL ADMIN v2.0 - CARRINHOS SVG ATIVADOS 🚗🚗🚗");
-    const apiBase = '/api/admin';
+  <script>\r\nconst apiBase = '/api/admin';
     let authHeader = null;
     let map = null;
     let mapFitted = false;
@@ -417,7 +413,7 @@
       if (!value) return '-';
       const text = `${value}`;
       if (text.length <= max) return text;
-      return `${text.slice(0, max - 1)}…`;
+      return `${text.slice(0, max - 1)}â€¦`;
     };
 
     const statusBadgeClass = (status) => {
@@ -1166,12 +1162,12 @@
         <div class="kpi-card">
           <div class="kpi-title">Usuarios</div>
           <div class="kpi-value">${usuarios.total || 0}</div>
-          <div class="kpi-sub">${usuarios.passageiros || 0} passageiros • ${usuarios.motoristas || 0} motoristas</div>
+          <div class="kpi-sub">${usuarios.passageiros || 0} passageiros â€¢ ${usuarios.motoristas || 0} motoristas</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-title">Corridas</div>
           <div class="kpi-value">${corridasData.hoje || 0}</div>
-          <div class="kpi-sub">${corridasData.semana || 0} semana • ${corridasData.mes || 0} mes</div>
+          <div class="kpi-sub">${corridasData.semana || 0} semana â€¢ ${corridasData.mes || 0} mes</div>
         </div>
         <div class="kpi-card">
           <div class="kpi-title">Receita</div>
@@ -1185,10 +1181,10 @@
         </div>
       `;
 
-      const serie = data?.graficoSemanal || [];
+      const serie = (data?.graficoSemanal || []).map((item) => ({...item, total: Number(item?.total) || 0}));
       const max = Math.max(1, ...serie.map((d) => d.total));
       grafico.innerHTML = serie.map((d) => {
-        const height = Math.round((d.total / max) * 120);
+        const height = Math.max(6, Math.round((d.total / max) * 120));
         return `
           <div class="bar" style="height:${height}px">
             <span>${d.total}</span>
