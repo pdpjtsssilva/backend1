@@ -3,9 +3,11 @@ const { spawn } = require('child_process');
 const maxAttempts = 5;
 const delayMs = 5000;
 
+const NPX_BIN = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+
 const runDeploy = () =>
   new Promise((resolve, reject) => {
-    const proc = spawn('npx', ['prisma', 'migrate', 'deploy'], { stdio: 'inherit' });
+    const proc = spawn(NPX_BIN, ['prisma', 'migrate', 'deploy'], { stdio: 'inherit' });
     proc.on('close', (code) => {
       if (code === 0) resolve();
       else reject(new Error(`prisma migrate deploy failed with code ${code}`));
