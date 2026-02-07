@@ -11,9 +11,13 @@ const SIGNUP_TOKEN = process.env.SIGNUP_TOKEN || ''; // Token para restringir ca
 // Cadastro
 router.post('/cadastro', async (req, res) => {
   try {
-    const { nome, email, senha, telefone, tipo, documento, signupToken } = req.body;
-    if (!email || !senha || !nome) {
-      return res.status(400).json({ error: 'Nome, email e senha sÃ£o obrigatÃ³rios' });
+    const { nome, email, senha, telefone, tipo, documento, signupToken } = req.body || {};
+    if (typeof email !== 'string' || typeof senha !== 'string' || typeof nome !== 'string') {
+      return res.status(400).json({ error: 'Nome, email e senha são obrigatórios' });
+    }
+    const emailLimpo = email.trim().toLowerCase();
+    if (!emailLimpo || !senha.trim() || !nome.trim()) {
+      return res.status(400).json({ error: 'Nome, email e senha são obrigatórios' });
     }
 
     // Se SIGNUP_TOKEN estiver definido no .env, exigir token de convite
@@ -21,13 +25,13 @@ router.post('/cadastro', async (req, res) => {
       const tokenHeader = req.headers['x-signup-token'];
       const provided = signupToken || tokenHeader;
       if (provided !== SIGNUP_TOKEN) {
-        return res.status(403).json({ error: 'Cadastro bloqueado. Token invÃ¡lido ou ausente.' });
+        return res.status(403).json({ error: 'Cadastro bloqueado. Token inválido ou ausente.' });
       }
     }
 
-    // Verificar se email jÃ¡ existe
+    // Verificar se email já existe
     const usuarioExistente = await prisma.user.findUnique({
-      where: { email }
+      where: { email: emailLimpo }
     });
 
     if (usuarioExistente) {
@@ -46,11 +50,11 @@ router.post('/cadastro', async (req, res) => {
     // Hash da senha
     const senhaHash = await bcrypt.hash(senha, 10);
 
-    // Criar usuÃ¡rio
+    // Criar usuário
     const usuario = await prisma.user.create({
       data: {
         nome,
-        email,
+        email: emailLimpo,
         senha: senhaHash,
         telefone,
         documento: documentoLimpo || null,
@@ -93,18 +97,21 @@ router.post('/cadastro', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 // Login
 router.post('/login', async (req, res) => {
   try {
-    const { email, senha } = req.body;
-    if (!email || !senha) {
-      return res.status(400).json({ error: 'Email e senha sÃ£o obrigatÃ³rios' });
+    const { email, senha } = req.body || {};
+    if (typeof email !== 'string' || typeof senha !== 'string') {
+      return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+    }
+    const emailLimpo = email.trim().toLowerCase();
+    if (!emailLimpo || !senha.trim()) {
+      return res.status(400).json({ error: 'Email e senha são obrigatórios' });
     }
 
-    // Buscar usuÃ¡rio
+    // Buscar usuário
     const usuario = await prisma.user.findUnique({
-      where: { email }
+      where: { email: emailLimpo }
     });
 
     if (!usuario) {
@@ -261,5 +268,10 @@ router.put('/atualizar/:id', async (req, res) => {
 });
 
 module.exports = router;
+
+
+
+
+
 
 
