@@ -20,6 +20,11 @@ const runDeploy = () =>
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function main() {
+  if (process.env.SKIP_PRISMA_DEPLOY === '1') {
+    console.log('SKIP_PRISMA_DEPLOY=1 set, skipping prisma migrate deploy.');
+    process.exit(0);
+  }
+
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       console.log(`Prisma deploy attempt ${attempt}/${maxAttempts}`);
