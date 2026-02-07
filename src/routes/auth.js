@@ -12,6 +12,9 @@ const SIGNUP_TOKEN = process.env.SIGNUP_TOKEN || ''; // Token para restringir ca
 router.post('/cadastro', async (req, res) => {
   try {
     const { nome, email, senha, telefone, tipo, documento, signupToken } = req.body;
+    if (!email || !senha || !nome) {
+      return res.status(400).json({ error: 'Nome, email e senha são obrigatórios' });
+    }
 
     // Se SIGNUP_TOKEN estiver definido no .env, exigir token de convite
     if (SIGNUP_TOKEN) {
@@ -95,6 +98,9 @@ router.post('/cadastro', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, senha } = req.body;
+    if (!email || !senha) {
+      return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+    }
 
     // Buscar usuário
     const usuario = await prisma.user.findUnique({
