@@ -101,13 +101,34 @@ function emitirNovaSolicitacaoParaMotoristas(data) {
   enviarParaProximoMotorista(corridaPayload);
 }
 
+const jwt = require('jsonwebtoken');
+
 function initializeWebSocket(server) {
   io = socketIO(server, {
     cors: { origin: '*', methods: ['GET', 'POST'] }
   });
 
+  // Middleware de Autenticação
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace('Bearer ', '');
+
+    if (!token) {
+      console.log(`Tentativa de conexão sem token: ${socket.id}`);
+      return next(new Error('Autenticação necessária'));
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defina_JWT_SECRET_no_env');
+      socket.user = decoded; // Anexa o usuário ao socket
+      next();
+    } catch (err) {
+      console.log(`Token inválido: ${socket.id}`, err.message);
+      next(new Error('Token inválido'));
+    }
+  });
+
   io.on('connection', (socket) => {
-    console.log('Novo cliente conectado:', socket.id);
+    console.log(`Novo cliente conectado: ${socket.id} (User: ${socket.user?.id})`);
 
     // MOTORISTA: Ficar online
     socket.on('motorista:online', (data) => {

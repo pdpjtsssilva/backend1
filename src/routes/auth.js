@@ -8,16 +8,30 @@ const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'defina_JWT_SECRET_no_env'; // Em produÃ§Ã£o, configure via .env
 const SIGNUP_TOKEN = process.env.SIGNUP_TOKEN || ''; // Token para restringir cadastro (opcional)
 
+const validate = require('../middlewares/validate');
+const { z } = require('zod');
+
+// Schemas de Validação
+const cadastroSchema = z.object({
+  body: z.object({
+    nome: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
+    email: z.string().email('Email inválido'),
+    senha: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
+    telefone: z.string().optional(),
+    documento: z.string().optional(),
+    tipo: z.enum(['passageiro', 'motorista']).optional(),
+    signupToken: z.string().optional(),
+  }),
+});
+
 // Cadastro
-router.post('/cadastro', async (req, res) => {
+router.post('/cadastro', validate(cadastroSchema), async (req, res) => {
   try {
-    const { nome, email, senha, telefone, tipo, documento, signupToken } = req.body || {};
-    const emailLimpo = typeof email === 'string' ? email.trim().toLowerCase() : '';
-    const senhaLimpa = typeof senha === 'string' ? senha.trim() : '';
-    const nomeLimpo = typeof nome === 'string' ? nome.trim() : '';
-    if (!emailLimpo || !senhaLimpa || !nomeLimpo) {
-      return res.status(400).json({ error: 'Nome, email e senha são obrigatórios' });
-    }
+    const { nome, email, senha, telefone, tipo, documento, signupToken } = req.body;
+    const emailLimpo = email.trim().toLowerCase();
+
+    // Removendo validações manuais pois o Zod já garante
+
     if (process.env.DEBUG_AUTH === '1') {
       console.log('AUTH cadastro payload', {
         hasBody: !!req.body,
@@ -105,15 +119,20 @@ router.post('/cadastro', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+const loginSchema = z.object({
+  body: z.object({
+    email: z.string().email('Email inválido'),
+    senha: z.string().min(1, 'Senha é obrigatória'),
+  }),
+});
+
 // Login
-router.post('/login', async (req, res) => {
+router.post('/login', validate(loginSchema), async (req, res) => {
   try {
-    const { email, senha } = req.body || {};
-    const emailLimpo = typeof email === 'string' ? email.trim().toLowerCase() : '';
-    const senhaLimpa = typeof senha === 'string' ? senha.trim() : '';
-    if (!emailLimpo || !senhaLimpa) {
-      return res.status(400).json({ error: 'Email e senha são obrigatórios' });
-    }
+    const { email, senha } = req.body;
+    const emailLimpo = email.trim().toLowerCase();
+
+    // Validacoes manuais removidas
     if (process.env.DEBUG_AUTH === '1') {
       console.log('AUTH login payload', {
         hasBody: !!req.body,

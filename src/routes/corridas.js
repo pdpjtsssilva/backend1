@@ -266,13 +266,25 @@ router.patch('/:id/aceitar', async (req, res) => {
     const { id } = req.params;
     const { motoristaId } = req.body;
 
-    const corrida = await prisma.corrida.update({
-      where: { id },
+    // Use updateMany para garantir atomicidade. Só atualiza se o status for 'aguardando'.
+    const resultado = await prisma.corrida.updateMany({
+      where: { 
+        id, 
+        status: 'aguardando' 
+      },
       data: {
         status: 'aceita',
         motoristaId
       }
     });
+
+    if (resultado.count === 0) {
+      // Se count for 0, ou a corrida não existe ou já foi aceita/cancelada
+      return res.status(409).json({ erro: 'Corrida não está mais disponível para aceite' });
+    }
+
+    // Retorna a corrida atualizada
+    const corrida = await prisma.corrida.findUnique({ where: { id } });
 
     res.json(corrida);
   } catch (error) {
