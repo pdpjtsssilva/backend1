@@ -102,8 +102,6 @@ function emitirNovaSolicitacaoParaMotoristas(data) {
   enviarParaProximoMotorista(corridaPayload);
 }
 
-const jwt = require('jsonwebtoken');
-
 function initializeWebSocket(server) {
   io = socketIO(server, {
     cors: { origin: '*', methods: ['GET', 'POST'] }
