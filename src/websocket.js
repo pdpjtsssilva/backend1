@@ -1,5 +1,6 @@
 const socketIO = require('socket.io');
 const { PrismaClient } = require('@prisma/client');
+const jwt = require('jsonwebtoken');
 
 let io;
 const prisma = new PrismaClient();
@@ -108,21 +109,25 @@ function initializeWebSocket(server) {
     cors: { origin: '*', methods: ['GET', 'POST'] }
   });
 
-  // Middleware de Autenticação
+  // Middleware de Autenticação (condicional)
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.replace('Bearer ', '');
 
+    // Se não tem token, permite conexão (Admin Panel)
     if (!token) {
-      console.log(`Tentativa de conexão sem token: ${socket.id}`);
-      return next(new Error('Autenticação necessária'));
+      console.log(`Conexão sem token permitida (Admin): ${socket.id}`);
+      socket.user = null; // Marca como não autenticado
+      return next();
     }
 
+    // Se tem token, valida (App Móvel)
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'defina_JWT_SECRET_no_env');
       socket.user = decoded; // Anexa o usuário ao socket
+      console.log(`Conexão autenticada via JWT: ${socket.id} (User: ${decoded.id})`);
       next();
     } catch (err) {
-      console.log(`Token inválido: ${socket.id}`, err.message);
+      console.log(`Token inválido rejeitado: ${socket.id}`, err.message);
       next(new Error('Token inválido'));
     }
   });
