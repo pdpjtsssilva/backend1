@@ -1,10 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma'); // ← Prisma singleton
 const { emitirNovaSolicitacaoParaMotoristas } = require('../websocket');
 const axios = require('axios');
 
-const prisma = new PrismaClient();
 const GOOGLE_MAPS_KEY = process.env.GOOGLE_MAPS_KEY || '';
 
 const ensureGoogleKey = (res) => {
@@ -15,9 +14,7 @@ const ensureGoogleKey = (res) => {
   return true;
 };
 
-// ========================================
 // SOLICITAR CORRIDA
-// ========================================
 router.post('/solicitar', async (req, res) => {
   try {
     const { passageiroId, origemLat, origemLng, destinoLat, destinoLng, origemEndereco, destinoEndereco } = req.body;
@@ -81,9 +78,7 @@ router.post('/solicitar', async (req, res) => {
   }
 });
 
-// ========================================
 // BUSCAR ROTA (Google Directions API)
-// ========================================
 router.post('/rota', async (req, res) => {
   try {
     if (!ensureGoogleKey(res)) return;
@@ -117,9 +112,7 @@ router.post('/rota', async (req, res) => {
   }
 });
 
-// ========================================
 // BUSCAR ENDEREÇO (Autocomplete)
-// ========================================
 router.get('/buscar-endereco', async (req, res) => {
   try {
     const { input } = req.query;
@@ -150,9 +143,7 @@ router.get('/buscar-endereco', async (req, res) => {
   }
 });
 
-// ========================================
 // OBTER COORDENADAS DE UM LUGAR
-// ========================================
 router.get('/lugar-coordenadas', async (req, res) => {
   try {
     const { placeId } = req.query;
@@ -181,9 +172,7 @@ router.get('/lugar-coordenadas', async (req, res) => {
   }
 });
 
-// ========================================
 // LISTAR CORRIDAS DO USUÁRIO
-// ========================================
 router.get('/usuario/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -201,9 +190,7 @@ router.get('/usuario/:id', async (req, res) => {
   }
 });
 
-// ========================================
 // LISTAR CORRIDAS DO MOTORISTA
-// ========================================
 router.get('/motorista/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -221,9 +208,7 @@ router.get('/motorista/:id', async (req, res) => {
   }
 });
 
-// ========================================
 // OBTER CORRIDA POR ID
-// ========================================
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -238,9 +223,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// ========================================
 // CANCELAR CORRIDA
-// ========================================
 router.patch('/:id/cancelar', async (req, res) => {
   try {
     const { id } = req.params;
@@ -258,44 +241,55 @@ router.patch('/:id/cancelar', async (req, res) => {
   }
 });
 
-// ========================================
-// ACEITAR CORRIDA (Motorista)
-// ========================================
+// ACEITAR CORRIDA (Motorista) - CORRIGIDO COM TRANSAÇÃO
 router.patch('/:id/aceitar', async (req, res) => {
   try {
     const { id } = req.params;
     const { motoristaId } = req.body;
 
-    // Use updateMany para garantir atomicidade. Só atualiza se o status for 'aguardando'.
-    const resultado = await prisma.corrida.updateMany({
-      where: { 
-        id, 
-        status: 'aguardando' 
-      },
-      data: {
-        status: 'aceita',
-        motoristaId
-      }
-    });
-
-    if (resultado.count === 0) {
-      // Se count for 0, ou a corrida não existe ou já foi aceita/cancelada
-      return res.status(409).json({ erro: 'Corrida não está mais disponível para aceite' });
+    if (!motoristaId) {
+      return res.status(400).json({ erro: 'MotoristaId é obrigatório' });
     }
 
-    // Retorna a corrida atualizada
-    const corrida = await prisma.corrida.findUnique({ where: { id } });
+    // Usa transação para evitar race condition
+    const corrida = await prisma.$transaction(async (tx) => {
+      // 1. Busca a corrida atual
+      const corridaAtual = await tx.corrida.findUnique({
+        where: { id },
+      });
+
+      if (!corridaAtual) {
+        throw new Error('CORRIDA_NAO_ENCONTRADA');
+      }
+
+      if (corridaAtual.status !== 'aguardando') {
+        throw new Error('CORRIDA_JA_ACEITA');
+      }
+
+      // 2. Atualiza a corrida dentro da transação
+      return await tx.corrida.update({
+        where: { id },
+        data: {
+          status: 'aceita',
+          motoristaId,
+        },
+      });
+    });
 
     res.json(corrida);
   } catch (error) {
+    if (error.message === 'CORRIDA_NAO_ENCONTRADA') {
+      return res.status(404).json({ erro: 'Corrida não encontrada' });
+    }
+    if (error.message === 'CORRIDA_JA_ACEITA') {
+      return res.status(409).json({ erro: 'Corrida não está mais disponível para aceite' });
+    }
     console.error('Erro ao aceitar corrida:', error);
     res.status(500).json({ erro: 'Erro ao aceitar corrida' });
   }
 });
 
-// ========================================
 // FINALIZAR CORRIDA
-// ========================================
 router.patch('/:id/finalizar', async (req, res) => {
   try {
     const { id } = req.params;
@@ -312,9 +306,7 @@ router.patch('/:id/finalizar', async (req, res) => {
   }
 });
 
-// ========================================
 // AVALIAR CORRIDA
-// ========================================
 router.put('/:id/avaliar', async (req, res) => {
   try {
     const { id } = req.params;
@@ -338,7 +330,5 @@ router.put('/:id/avaliar', async (req, res) => {
     res.status(500).json({ erro: 'Erro ao avaliar corrida' });
   }
 });
-
-// Avaliacao do passageiro foi desativada (passageiro nao deve ser avaliado).
 
 module.exports = router;

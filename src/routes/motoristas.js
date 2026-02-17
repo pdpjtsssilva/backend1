@@ -3,10 +3,10 @@ const router = express.Router();
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const { PrismaClient } = require('@prisma/client');
+// Prisma singleton
 const cloudinary = require('cloudinary').v2;
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }

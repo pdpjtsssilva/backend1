@@ -1,9 +1,9 @@
 const socketIO = require('socket.io');
-const { PrismaClient } = require('@prisma/client');
+// Prisma singleton
 const jwt = require('jsonwebtoken');
 
 let io;
-const prisma = new PrismaClient();
+const prisma = require('./lib/prisma');
 const motoristasOnline = new Map();
 const corridasAtivas = new Map();
 const passageirosOnline = new Map();

@@ -1,9 +1,9 @@
 // backend/src/routes/favoritos.js
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+// Prisma singleton
 
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 // 📋 LISTAR FAVORITOS DO USUÁRIO
 router.get('/usuario/:userId', async (req, res) => {

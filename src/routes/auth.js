@@ -2,11 +2,14 @@
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma'); // ← Prisma singleton
 
-const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'defina_JWT_SECRET_no_env'; // Em produÃ§Ã£o, configure via .env
-const SIGNUP_TOKEN = process.env.SIGNUP_TOKEN || ''; // Token para restringir cadastro (opcional)
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET deve ser definido no arquivo .env');
+}
+
+const SIGNUP_TOKEN = process.env.SIGNUP_TOKEN || '';
 
 const validate = require('../middlewares/validate');
 const { z } = require('zod');
@@ -30,14 +33,11 @@ router.post('/cadastro', validate(cadastroSchema), async (req, res) => {
     const { nome, email, senha, telefone, tipo, documento, signupToken } = req.body;
     const emailLimpo = email.trim().toLowerCase();
 
-    // Removendo validações manuais pois o Zod já garante
-
     if (process.env.DEBUG_AUTH === '1') {
       console.log('AUTH cadastro payload', {
         hasBody: !!req.body,
-        keys: req.body ? Object.keys(req.body) : [],
+        keys: req.body ? Object.keys(req.body).filter(k => k !== 'senha') : [],
         emailType: typeof email,
-        senhaType: typeof senha,
         nomeType: typeof nome
       });
     }
@@ -69,6 +69,7 @@ router.post('/cadastro', validate(cadastroSchema), async (req, res) => {
         return res.status(400).json({ error: 'Documento ja cadastrado' });
       }
     }
+
     // Hash da senha
     const senhaHash = await bcrypt.hash(senha, 10);
 
@@ -91,12 +92,8 @@ router.post('/cadastro', validate(cadastroSchema), async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    if (usuario.statusConta === 'bloqueado') {
-      return res.status(403).json({ error: 'Conta bloqueada pelo administrador' });
-    }
-    if (usuario.statusConta === 'suspenso' && usuario.suspensoAte && new Date(usuario.suspensoAte) > new Date()) {
-      return res.status(403).json({ error: 'Conta suspensa temporariamente' });
-    }
+    // REMOVIDO: Validação de statusConta aqui (era um bug)
+    // Usuário recém-criado sempre terá statusConta = 'ativo'
 
     res.json({
       token,
@@ -119,6 +116,7 @@ router.post('/cadastro', validate(cadastroSchema), async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 const loginSchema = z.object({
   body: z.object({
     email: z.string().email('Email inválido'),
@@ -132,13 +130,11 @@ router.post('/login', validate(loginSchema), async (req, res) => {
     const { email, senha } = req.body;
     const emailLimpo = email.trim().toLowerCase();
 
-    // Validacoes manuais removidas
     if (process.env.DEBUG_AUTH === '1') {
       console.log('AUTH login payload', {
         hasBody: !!req.body,
-        keys: req.body ? Object.keys(req.body) : [],
-        emailType: typeof email,
-        senhaType: typeof senha
+        keys: req.body ? Object.keys(req.body).filter(k => k !== 'senha') : [],
+        emailType: typeof email
       });
     }
 
@@ -154,15 +150,13 @@ router.post('/login', validate(loginSchema), async (req, res) => {
     if (usuario.statusConta === 'bloqueado') {
       return res.status(403).json({ error: 'Conta bloqueada pelo administrador' });
     }
+
     if (usuario.statusConta === 'suspenso' && usuario.suspensoAte && new Date(usuario.suspensoAte) > new Date()) {
       return res.status(403).json({ error: 'Conta suspensa temporariamente' });
     }
 
-    // Verificar senha
-    const senhaValida =
-      usuario.senha && usuario.senha.startsWith('$2b$')
-        ? await bcrypt.compare(senha, usuario.senha)
-        : senha === usuario.senha;
+    // Verificar senha - SEMPRE com bcrypt (BUG CORRIGIDO)
+    const senhaValida = await bcrypt.compare(senha, usuario.senha);
 
     if (!senhaValida) {
       return res.status(401).json({ error: 'Email ou senha incorretos' });
@@ -203,7 +197,7 @@ router.get('/verificar', async (req, res) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
 
     if (!token) {
-      return res.status(401).json({ error: 'Token nÃ£o fornecido' });
+      return res.status(401).json({ error: 'Token não fornecido' });
     }
 
     const decoded = jwt.verify(token, JWT_SECRET);
@@ -213,7 +207,7 @@ router.get('/verificar', async (req, res) => {
     });
 
     if (!usuario) {
-      return res.status(401).json({ error: 'UsuÃ¡rio nÃ£o encontrado' });
+      return res.status(401).json({ error: 'Usuário não encontrado' });
     }
 
     res.json({
@@ -232,18 +226,18 @@ router.get('/verificar', async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(401).json({ error: 'Token invÃ¡lido' });
+    res.status(401).json({ error: 'Token inválido' });
   }
 });
 
-// Atualizar perfil bÃ¡sico
+// Atualizar perfil básico
 router.put('/atualizar/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { nome, email, telefone, documento } = req.body;
 
     if (!nome || !email) {
-      return res.status(400).json({ erro: 'Nome e email sÃ£o obrigatÃ³rios' });
+      return res.status(400).json({ erro: 'Nome e email são obrigatórios' });
     }
 
     // Garantir unicidade do email
@@ -301,10 +295,3 @@ router.put('/atualizar/:id', async (req, res) => {
 });
 
 module.exports = router;
-
-
-
-
-
-
-
