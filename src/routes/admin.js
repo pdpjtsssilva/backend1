@@ -624,4 +624,66 @@ router.get('/dashboard', async (_req, res) => {
   }
 });
 
+// ========================================
+// AVALIACOES
+// ========================================
+router.get('/avaliacoes', async (req, res) => {
+  try {
+    const { limit = 50, motoristaId, minNota, maxNota } = req.query;
+
+    const where = {
+      avaliacao: { not: null }
+    };
+
+    if (motoristaId) where.motoristaId = motoristaId;
+    if (minNota) where.avaliacao = { gte: Number(minNota) };
+    if (maxNota) where.avaliacao = { ...where.avaliacao, lte: Number(maxNota) };
+
+    const avaliacoes = await prisma.corrida.findMany({
+      where,
+      select: {
+        id: true,
+        avaliacao: true,
+        comentarioAvaliacao: true,
+        motoristaId: true,
+        passageiroId: true,
+        preco: true,
+        createdAt: true,
+        passageiro: {
+          select: {
+            id: true,
+            nome: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Number(limit)
+    });
+
+    // Buscar nomes dos motoristas
+    const motoristasIds = [...new Set(avaliacoes.map(a => a.motoristaId).filter(Boolean))];
+    const motoristas = await prisma.user.findMany({
+      where: { id: { in: motoristasIds } },
+      select: { id: true, nome: true }
+    });
+
+    const motoristasMap = new Map(motoristas.map(m => [m.id, m]));
+
+    const resultado = avaliacoes.map(av => ({
+      id: av.id,
+      nota: av.avaliacao,
+      comentario: av.comentarioAvaliacao,
+      motorista: motoristasMap.get(av.motoristaId) || { id: av.motoristaId, nome: 'Desconhecido' },
+      passageiro: av.passageiro,
+      preco: av.preco,
+      data: av.createdAt
+    }));
+
+    res.json(resultado);
+  } catch (error) {
+    console.error('Erro ao buscar avaliacoes:', error);
+    res.status(500).json({ erro: 'Erro ao buscar avaliacoes' });
+  }
+});
+
 module.exports = router;

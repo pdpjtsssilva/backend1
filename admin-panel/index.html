@@ -1,4 +1,4 @@
-﻿ï»¿<!DOCTYPE html>
+ï»¿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
@@ -390,6 +390,7 @@ const apiBase = '/api/admin';
     const motoristas = new Map();
     let corridas = [];
     let transacoes = [];
+    let avaliacoes = [];
     let passageiros = [];
     let lastMotoristaPos = null;
     let refreshTimer = null;
@@ -513,6 +514,13 @@ function renderDashboard() {
               <div>
                 Pagamentos
                 <div><span>Em breve</span></div>
+              </div>
+            </div>
+            <div class="nav-item" onclick="activateNav(this, 'avaliacoesSection')">
+              <div class="legend-dot" style="background: #f59e0b;"></div>
+              <div>
+                Avaliações
+                <div><span id="totalAvaliacoes">0</span></div>
               </div>
             </div>
           </aside>
@@ -676,6 +684,43 @@ function renderDashboard() {
                   </thead>
                   <tbody id="pagamentosBody">
                     <tr><td colspan="5">Carregando...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="section" id="avaliacoesSection">
+              <div class="card">
+                <div class="split-header">
+                  <div>
+                    <h2 style="margin:0;">Avaliações</h2>
+                    <div class="muted" id="avaliacoesStats">Carregando...</div>
+                  </div>
+                  <div class="row" style="gap:8px;">
+                    <select id="filtroNota" style="padding:6px 10px; border-radius:8px; background:var(--card); border:1px solid var(--stroke); color:var(--text);" onchange="reloadAvaliacoes()">
+                      <option value="">Todas as notas</option>
+                      <option value="5">⭐⭐⭐⭐⭐ (5)</option>
+                      <option value="4">⭐⭐⭐⭐ (4)</option>
+                      <option value="3">⭐⭐⭐ (3)</option>
+                      <option value="2">⭐⭐ (2)</option>
+                      <option value="1">⭐ (1)</option>
+                    </select>
+                    <button class="btn-ghost" onclick="reloadAvaliacoes()">Recarregar</button>
+                  </div>
+                </div>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Motorista</th>
+                      <th>Passageiro</th>
+                      <th>Nota</th>
+                      <th>Comentário</th>
+                      <th>Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody id="avaliacoesBody">
+                    <tr><td colspan="6">Carregando...</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -1281,6 +1326,67 @@ function renderDashboard() {
       }
     }
 
+    async function loadAvaliacoes() {
+      const filtroNota = qs('#filtroNota')?.value || '';
+      const params = new URLSearchParams({ limit: 50 });
+      if (filtroNota) {
+        params.append('minNota', filtroNota);
+        params.append('maxNota', filtroNota);
+      }
+      const resp = await fetch(`${apiBase}/avaliacoes?${params.toString()}`, {
+        headers: { Authorization: authHeader }
+      });
+      if (resp.status === 401) {
+        renderLogin();
+        return;
+      }
+      avaliacoes = await resp.json();
+    }
+
+    function renderAvaliacoes() {
+      const tbody = qs('#avaliacoesBody');
+      if (!tbody) return;
+      
+      const renderEstrelas = (nota) => {
+        return '⭐'.repeat(nota || 0);
+      };
+
+      const rows = avaliacoes.map((av) => {
+        const motorista = av.motorista?.nome || 'Desconhecido';
+        const passageiro = av.passageiro?.nome || 'Desconhecido';
+        const comentario = av.comentario || '-';
+        const notaClass = av.nota >= 4 ? 'status-ok' : av.nota === 3 ? 'status-warn' : 'status-danger';
+        return `
+          <tr>
+            <td>${formatDate(av.data)}</td>
+            <td>${motorista}</td>
+            <td>${passageiro}</td>
+            <td><span class="badge ${notaClass}">${renderEstrelas(av.nota)}</span></td>
+            <td style="max-width:300px; overflow:hidden; text-overflow:ellipsis;">${comentario}</td>
+            <td>${formatMoney(av.preco)}</td>
+          </tr>
+        `;
+      }).join('');
+      tbody.innerHTML = rows || '<tr><td colspan="6">Nenhuma avaliacao encontrada</td></tr>';
+      
+      const stats = qs('#avaliacoesStats');
+      const totalAvaliacoesSpan = qs('#totalAvaliacoes');
+      if (stats) {
+        const media = avaliacoes.length > 0 
+          ? (avaliacoes.reduce((sum, av) => sum + (av.nota || 0), 0) / avaliacoes.length).toFixed(1)
+          : '0.0';
+        stats.textContent = `${avaliacoes.length} avaliações • Média: ${media} ⭐`;
+      }
+      if (totalAvaliacoesSpan) {
+        totalAvaliacoesSpan.textContent = avaliacoes.length;
+      }
+    }
+
+    async function reloadAvaliacoes() {
+      await loadAvaliacoes();
+      renderAvaliacoes();
+    }
+
     async function loadOnline() {
       const resp = await fetch(`${apiBase}/motoristas-online`, {
         headers: { Authorization: authHeader }
@@ -1498,6 +1604,8 @@ function renderDashboard() {
         renderCorridas();
         await loadPagamentos();
         renderPagamentos();
+        await loadAvaliacoes();
+        renderAvaliacoes();
         await reloadDashboard();
         if (dashboardTimer) clearInterval(dashboardTimer);
         dashboardTimer = setInterval(reloadDashboard, 15000);
@@ -1507,6 +1615,8 @@ function renderDashboard() {
           renderCorridas();
           await loadPagamentos();
           renderPagamentos();
+          await loadAvaliacoes();
+          renderAvaliacoes();
         }, 15000);
       } catch (err) {
         console.error(err);
