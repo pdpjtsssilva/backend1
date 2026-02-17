@@ -294,9 +294,82 @@ router.patch('/:id/finalizar', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const corrida = await prisma.corrida.update({
+    // Buscar corrida com informações do motorista
+    const corrida = await prisma.corrida.findUnique({
+      where: { id },
+      include: { passageiro: true }
+    });
+
+    if (!corrida) {
+      return res.status(404).json({ erro: 'Corrida não encontrada' });
+    }
+
+    if (!corrida.motoristaId) {
+      return res.status(400).json({ erro: 'Corrida sem motorista' });
+    }
+
+    // Atualizar status da corrida
+    await prisma.corrida.update({
       where: { id },
       data: { status: 'finalizada' }
+    });
+
+    // Buscar ou criar carteira do motorista
+    let carteira = await prisma.carteira.findUnique({
+      where: { userId: corrida.motoristaId }
+    });
+
+    if (!carteira) {
+      carteira = await prisma.carteira.create({
+        data: { userId: corrida.motoristaId, saldo: 0 }
+      });
+    }
+
+    // Calcular valores (comissão de 20%)
+    const TAXA_COMISSAO = 0.20;
+    const valorTotal = corrida.preco;
+    const comissao = valorTotal * TAXA_COMISSAO;
+    const valorMotorista = valorTotal - comissao;
+
+    const saldoAnterior = carteira.saldo;
+    const saldoNovo = saldoAnterior + valorMotorista;
+
+    // Criar transação de crédito para o motorista
+    await prisma.transacao.create({
+      data: {
+        userId: corrida.motoristaId,
+        tipo: 'credito',
+        valor: valorMotorista,
+        descricao: `Corrida ${id.substring(0, 8)} - ${corrida.passageiro.nome}`,
+        categoria: 'recebimento',
+        metodoPagamento: corrida.metodoPagamento || 'app',
+        status: 'aprovada',
+        referencia: id,
+        saldoAnterior,
+        saldoNovo
+      }
+    });
+
+    // Criar transação de débito (comissão da plataforma)
+    await prisma.transacao.create({
+      data: {
+        userId: corrida.motoristaId,
+        tipo: 'debito',
+        valor: comissao,
+        descricao: `Comissão (20%) - Corrida ${id.substring(0, 8)}`,
+        categoria: 'comissao',
+        metodoPagamento: corrida.metodoPagamento || 'app',
+        status: 'aprovada',
+        referencia: id,
+        saldoAnterior: saldoNovo,
+        saldoNovo: saldoNovo
+      }
+    });
+
+    // Atualizar saldo da carteira
+    await prisma.carteira.update({
+      where: { userId: corrida.motoristaId },
+      data: { saldo: saldoNovo }
     });
 
     res.json(corrida);
