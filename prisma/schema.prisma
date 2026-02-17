@@ -25,6 +25,8 @@ model User {
   cnhStatus    String?  @default("pendente")
   statusConta  String   @default("ativo") // ativo, bloqueado, suspenso
   suspensoAte  DateTime?
+  metodoPagamentoPadrao String? @default("cartao") // cartao, pix, dinheiro, mbway
+  notificacoesAtivas Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
