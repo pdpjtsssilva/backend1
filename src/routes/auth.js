@@ -234,7 +234,7 @@ router.get('/verificar', async (req, res) => {
 router.put('/atualizar/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { nome, email, telefone, documento } = req.body;
+    const { nome, email, telefone, documento, metodoPagamentoPadrao, notificacoesAtivas } = req.body;
 
     if (!nome || !email) {
       return res.status(400).json({ erro: 'Nome e email são obrigatórios' });
@@ -265,14 +265,24 @@ router.put('/atualizar/:id', async (req, res) => {
       }
     }
 
+    const updateData = {
+      nome,
+      email,
+      telefone,
+      documento: documentoLimpo || null
+    };
+
+    // Adicionar preferências se fornecidas
+    if (metodoPagamentoPadrao !== undefined) {
+      updateData.metodoPagamentoPadrao = metodoPagamentoPadrao;
+    }
+    if (notificacoesAtivas !== undefined) {
+      updateData.notificacoesAtivas = notificacoesAtivas;
+    }
+
     const usuario = await prisma.user.update({
       where: { id },
-      data: {
-        nome,
-        email,
-        telefone,
-        documento: documentoLimpo || null
-      }
+      data: updateData
     });
 
     res.json({
