@@ -108,7 +108,9 @@ router.post('/cadastro', validate(cadastroSchema), async (req, res) => {
         cnhVersoUri: usuario.cnhVersoUri,
         cnhStatus: usuario.cnhStatus,
         statusConta: usuario.statusConta,
-        suspensoAte: usuario.suspensoAte
+        suspensoAte: usuario.suspensoAte,
+        metodoPagamentoPadrao: usuario.metodoPagamentoPadrao,
+        notificacoesAtivas: usuario.notificacoesAtivas
       }
     });
   } catch (error) {
@@ -182,7 +184,9 @@ router.post('/login', validate(loginSchema), async (req, res) => {
         cnhVersoUri: usuario.cnhVersoUri,
         cnhStatus: usuario.cnhStatus,
         statusConta: usuario.statusConta,
-        suspensoAte: usuario.suspensoAte
+        suspensoAte: usuario.suspensoAte,
+        metodoPagamentoPadrao: usuario.metodoPagamentoPadrao,
+        notificacoesAtivas: usuario.notificacoesAtivas
       }
     });
   } catch (error) {
@@ -222,7 +226,9 @@ router.get('/verificar', async (req, res) => {
         cnhVersoUri: usuario.cnhVersoUri,
         cnhStatus: usuario.cnhStatus,
         statusConta: usuario.statusConta,
-        suspensoAte: usuario.suspensoAte
+        suspensoAte: usuario.suspensoAte,
+        metodoPagamentoPadrao: usuario.metodoPagamentoPadrao,
+        notificacoesAtivas: usuario.notificacoesAtivas
       }
     });
   } catch (error) {
@@ -296,7 +302,9 @@ router.put('/atualizar/:id', async (req, res) => {
       cnhVersoUri: usuario.cnhVersoUri,
       cnhStatus: usuario.cnhStatus,
       statusConta: usuario.statusConta,
-      suspensoAte: usuario.suspensoAte
+      suspensoAte: usuario.suspensoAte,
+      metodoPagamentoPadrao: usuario.metodoPagamentoPadrao,
+      notificacoesAtivas: usuario.notificacoesAtivas
     });
   } catch (error) {
     console.error('Erro ao atualizar perfil:', error);
