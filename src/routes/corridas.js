@@ -372,6 +372,12 @@ router.patch('/:id/finalizar', async (req, res) => {
       data: { saldo: saldoNovo }
     });
 
+    // Limpar método de pagamento do passageiro para próxima corrida
+    await prisma.user.update({
+      where: { id: corrida.passageiroId },
+      data: { metodoPagamentoPadrao: null }
+    });
+
     res.json(corrida);
   } catch (error) {
     console.error('Erro ao finalizar corrida:', error);
