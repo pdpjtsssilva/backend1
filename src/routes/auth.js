@@ -9,6 +9,24 @@ if (!JWT_SECRET) {
   throw new Error('JWT_SECRET deve ser definido no arquivo .env');
 }
 
+// Middleware de autenticação admin
+const verificarAdmin = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  const adminToken = process.env.ADMIN_TOKEN || 'admin_default_token_change_me';
+  
+  if (!authHeader) {
+    return res.status(401).json({ erro: 'Token de autorização não fornecido' });
+  }
+  
+  const token = authHeader.replace('Bearer ', '');
+  
+  if (token !== adminToken) {
+    return res.status(403).json({ erro: 'Acesso negado: token inválido' });
+  }
+  
+  next();
+};
+
 const SIGNUP_TOKEN = process.env.SIGNUP_TOKEN || '';
 
 const validate = require('../middlewares/validate');
@@ -309,6 +327,20 @@ router.put('/atualizar/:id', async (req, res) => {
   } catch (error) {
     console.error('Erro ao atualizar perfil:', error);
     res.status(500).json({ erro: 'Erro ao atualizar perfil' });
+  }
+});
+
+// Endpoint de limpeza - Protegido com autenticação admin
+router.post('/limpar-metodos-passageiros', verificarAdmin, async (req, res) => {
+  try {
+    const result = await prisma.user.updateMany({
+      where: { tipo: 'passageiro' },
+      data: { metodoPagamentoPadrao: null }
+    });
+    res.json({ message: `${result.count} passageiros atualizados` });
+  } catch (error) {
+    console.error('Erro ao limpar métodos:', error);
+    res.status(500).json({ erro: 'Erro ao limpar métodos' });
   }
 });
 
