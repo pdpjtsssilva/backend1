@@ -52,6 +52,12 @@ router.post('/solicitar', async (req, res) => {
       }
     });
 
+    // Limpar método de pagamento para forçar escolha na próxima corrida
+    await prisma.user.update({
+      where: { id: passageiroId },
+      data: { metodoPagamentoPadrao: null }
+    });
+
     try {
       const passageiro = await prisma.user.findUnique({
         where: { id: passageiroId },
