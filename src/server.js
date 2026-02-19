@@ -34,8 +34,7 @@ app.use('/api/corridas', corridasRoutes);
 app.use('/api/favoritos', favoritosRoutes);
 app.use('/api/pagamentos', pagamentosRoutes);
 app.use('/api/carros', carrosRoutes);
-app.use('/api/motoristas', motoristasRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/admin/api', adminRoutes);
 app.use('/admin', express.static(path.join(__dirname, '..', 'admin-panel')));
 
 // Rota de status
