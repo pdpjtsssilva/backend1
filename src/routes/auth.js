@@ -2,391 +2,82 @@
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const prisma = require('../lib/prisma'); // ← Prisma singleton
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET deve ser definido no arquivo .env');
-}
+// --- ROTA DE CADASTRO ---
+router.post('/cadastro', async (req, res) => {
+    try {
+        const { nome, email, senha, telefone, tipo } = req.body;
 
-// Middleware de autenticação admin
-const verificarAdmin = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  const adminToken = process.env.ADMIN_TOKEN || 'admin_default_token_change_me';
-  
-  if (!authHeader) {
-    return res.status(401).json({ erro: 'Token de autorização não fornecido' });
-  }
-  
-  const token = authHeader.replace('Bearer ', '');
-  
-  if (token !== adminToken) {
-    return res.status(403).json({ erro: 'Acesso negado: token inválido' });
-  }
-  
-  next();
-};
+        // CORREÇÃO: De 'user' para 'usuario'
+        const usuarioExiste = await prisma.usuario.findUnique({
+            where: { email }
+        });
 
-const SIGNUP_TOKEN = process.env.SIGNUP_TOKEN || '';
-
-const validate = require('../middlewares/validate');
-const { z } = require('zod');
-
-// Schemas de Validação
-const cadastroSchema = z.object({
-  body: z.object({
-    nome: z.string().min(3, 'Nome deve ter no mínimo 3 caracteres'),
-    email: z.string().email('Email inválido'),
-    senha: z.string().min(6, 'Senha deve ter no mínimo 6 caracteres'),
-    telefone: z.string().optional(),
-    documento: z.string().optional(),
-    tipo: z.enum(['passageiro', 'motorista']).optional(),
-    signupToken: z.string().optional(),
-  }),
-});
-
-// Cadastro
-router.post('/cadastro', validate(cadastroSchema), async (req, res) => {
-  try {
-    const { nome, email, senha, telefone, tipo, documento, signupToken } = req.body;
-    const emailLimpo = email.trim().toLowerCase();
-
-    if (process.env.DEBUG_AUTH === '1') {
-      console.log('AUTH cadastro payload', {
-        hasBody: !!req.body,
-        keys: req.body ? Object.keys(req.body).filter(k => k !== 'senha') : [],
-        emailType: typeof email,
-        nomeType: typeof nome
-      });
-    }
-
-    // Se SIGNUP_TOKEN estiver definido no .env, exigir token de convite
-    if (SIGNUP_TOKEN) {
-      const tokenHeader = req.headers['x-signup-token'];
-      const provided = signupToken || tokenHeader;
-      if (provided !== SIGNUP_TOKEN) {
-        return res.status(403).json({ error: 'Cadastro bloqueado. Token inválido ou ausente.' });
-      }
-    }
-
-    // Verificar se email já existe
-    const usuarioExistente = await prisma.user.findUnique({
-      where: { email: emailLimpo }
-    });
-
-    if (usuarioExistente) {
-      return res.status(400).json({ error: 'Email ja cadastrado' });
-    }
-
-    const documentoLimpo = documento?.trim();
-    if (documentoLimpo) {
-      const documentoExistente = await prisma.user.findFirst({
-        where: { documento: documentoLimpo }
-      });
-      if (documentoExistente) {
-        return res.status(400).json({ error: 'Documento ja cadastrado' });
-      }
-    }
-
-    // Hash da senha
-    const senhaHash = await bcrypt.hash(senha, 10);
-
-    // Criar usuário
-    const usuario = await prisma.user.create({
-      data: {
-        nome,
-        email: emailLimpo,
-        senha: senhaHash,
-        telefone,
-        documento: documentoLimpo || null,
-        tipo: tipo || 'passageiro'
-      }
-    });
-
-    // Gerar token JWT
-    const token = jwt.sign(
-      { id: usuario.id, email: usuario.email, tipo: usuario.tipo },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    // REMOVIDO: Validação de statusConta aqui (era um bug)
-    // Usuário recém-criado sempre terá statusConta = 'ativo'
-
-    res.json({
-      token,
-      usuario: {
-        id: usuario.id,
-        nome: usuario.nome,
-        email: usuario.email,
-        telefone: usuario.telefone,
-        documento: usuario.documento,
-        tipo: usuario.tipo,
-        cnhFrenteUri: usuario.cnhFrenteUri,
-        cnhVersoUri: usuario.cnhVersoUri,
-        cnhStatus: usuario.cnhStatus,
-        statusConta: usuario.statusConta,
-        suspensoAte: usuario.suspensoAte,
-        metodoPagamentoPadrao: usuario.metodoPagamentoPadrao,
-        notificacoesAtivas: usuario.notificacoesAtivas
-      }
-    });
-  } catch (error) {
-    console.error('Erro no cadastro:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-const loginSchema = z.object({
-  body: z.object({
-    email: z.string().email('Email inválido'),
-    senha: z.string().min(1, 'Senha é obrigatória'),
-  }),
-});
-
-// Login
-router.post('/login', validate(loginSchema), async (req, res) => {
-  try {
-    const { email, senha } = req.body;
-    const emailLimpo = email.trim().toLowerCase();
-
-    if (process.env.DEBUG_AUTH === '1') {
-      console.log('AUTH login payload', {
-        hasBody: !!req.body,
-        keys: req.body ? Object.keys(req.body).filter(k => k !== 'senha') : [],
-        emailType: typeof email
-      });
-    }
-
-    // Buscar usuário
-    const usuario = await prisma.user.findUnique({
-      where: { email: emailLimpo }
-    });
-
-    if (!usuario) {
-      return res.status(401).json({ error: 'Email ou senha incorretos' });
-    }
-
-    if (usuario.statusConta === 'bloqueado') {
-      return res.status(403).json({ error: 'Conta bloqueada pelo administrador' });
-    }
-
-    if (usuario.statusConta === 'suspenso' && usuario.suspensoAte && new Date(usuario.suspensoAte) > new Date()) {
-      return res.status(403).json({ error: 'Conta suspensa temporariamente' });
-    }
-
-    // Verificar senha - SEMPRE com bcrypt (BUG CORRIGIDO)
-    const senhaValida = await bcrypt.compare(senha, usuario.senha);
-
-    if (!senhaValida) {
-      return res.status(401).json({ error: 'Email ou senha incorretos' });
-    }
-
-    // Gerar token JWT
-    const token = jwt.sign(
-      { id: usuario.id, email: usuario.email, tipo: usuario.tipo },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.json({
-      token,
-      usuario: {
-        id: usuario.id,
-        nome: usuario.nome,
-        email: usuario.email,
-        telefone: usuario.telefone,
-        documento: usuario.documento,
-        tipo: usuario.tipo,
-        cnhFrenteUri: usuario.cnhFrenteUri,
-        cnhVersoUri: usuario.cnhVersoUri,
-        cnhStatus: usuario.cnhStatus,
-        statusConta: usuario.statusConta,
-        suspensoAte: usuario.suspensoAte,
-        metodoPagamentoPadrao: usuario.metodoPagamentoPadrao,
-        notificacoesAtivas: usuario.notificacoesAtivas
-      }
-    });
-  } catch (error) {
-    console.error('Erro no login:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Verificar token
-router.get('/verificar', async (req, res) => {
-  try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-
-    if (!token) {
-      return res.status(401).json({ error: 'Token não fornecido' });
-    }
-
-    const decoded = jwt.verify(token, JWT_SECRET);
-
-    const usuario = await prisma.user.findUnique({
-      where: { id: decoded.id }
-    });
-
-    if (!usuario) {
-      return res.status(401).json({ error: 'Usuário não encontrado' });
-    }
-
-    res.json({
-      usuario: {
-        id: usuario.id,
-        nome: usuario.nome,
-        email: usuario.email,
-        telefone: usuario.telefone,
-        documento: usuario.documento,
-        tipo: usuario.tipo,
-        cnhFrenteUri: usuario.cnhFrenteUri,
-        cnhVersoUri: usuario.cnhVersoUri,
-        cnhStatus: usuario.cnhStatus,
-        statusConta: usuario.statusConta,
-        suspensoAte: usuario.suspensoAte,
-        metodoPagamentoPadrao: usuario.metodoPagamentoPadrao,
-        notificacoesAtivas: usuario.notificacoesAtivas
-      }
-    });
-  } catch (error) {
-    res.status(401).json({ error: 'Token inválido' });
-  }
-});
-
-// Atualizar perfil básico
-router.put('/atualizar/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { nome, email, telefone, documento, metodoPagamentoPadrao, notificacoesAtivas } = req.body;
-
-    if (!nome || !email) {
-      return res.status(400).json({ erro: 'Nome e email são obrigatórios' });
-    }
-
-    // Garantir unicidade do email
-    const emailJaUsado = await prisma.user.findFirst({
-      where: {
-        email,
-        NOT: { id }
-      }
-    });
-
-    if (emailJaUsado) {
-      return res.status(400).json({ erro: 'Email ja esta em uso' });
-    }
-
-    const documentoLimpo = documento?.trim();
-    if (documentoLimpo) {
-      const documentoJaUsado = await prisma.user.findFirst({
-        where: {
-          documento: documentoLimpo,
-          NOT: { id }
+        if (usuarioExiste) {
+            return res.status(400).json({ error: 'Este e-mail já está em uso.' });
         }
-      });
-      if (documentoJaUsado) {
-        return res.status(400).json({ erro: 'Documento ja esta em uso' });
-      }
+
+        const salt = await bcrypt.genSalt(10);
+        const senhaHash = await bcrypt.hash(senha, salt);
+
+        // Criando na tabela 'usuario'
+        const novoUsuario = await prisma.usuario.create({
+            data: {
+                nome,
+                email,
+                senha: senhaHash,
+                telefone,
+                tipo: tipo || 'PASSAGEIRO'
+            }
+        });
+
+        res.status(201).json({
+            message: 'Usuário cadastrado com sucesso!',
+            usuario: { id: novoUsuario.id, nome: novoUsuario.nome }
+        });
+
+    } catch (error) {
+        console.error("Erro no cadastro:", error);
+        res.status(500).json({ error: 'Erro ao processar o cadastro.' });
     }
-
-    const updateData = {
-      nome,
-      email,
-      telefone,
-      documento: documentoLimpo || null
-    };
-
-    // Adicionar preferências se fornecidas
-    if (metodoPagamentoPadrao !== undefined) {
-      updateData.metodoPagamentoPadrao = metodoPagamentoPadrao;
-    }
-    if (notificacoesAtivas !== undefined) {
-      updateData.notificacoesAtivas = notificacoesAtivas;
-    }
-
-    const usuario = await prisma.user.update({
-      where: { id },
-      data: updateData
-    });
-
-    res.json({
-      id: usuario.id,
-      nome: usuario.nome,
-      email: usuario.email,
-      telefone: usuario.telefone,
-      documento: usuario.documento,
-      tipo: usuario.tipo,
-      cnhFrenteUri: usuario.cnhFrenteUri,
-      cnhVersoUri: usuario.cnhVersoUri,
-      cnhStatus: usuario.cnhStatus,
-      statusConta: usuario.statusConta,
-      suspensoAte: usuario.suspensoAte,
-      metodoPagamentoPadrao: usuario.metodoPagamentoPadrao,
-      notificacoesAtivas: usuario.notificacoesAtivas
-    });
-  } catch (error) {
-    console.error('Erro ao atualizar perfil:', error);
-    res.status(500).json({ erro: 'Erro ao atualizar perfil' });
-  }
 });
 
-// Endpoint de limpeza - Protegido com autenticação admin
-router.post('/limpar-metodos-passageiros', verificarAdmin, async (req, res) => {
-  try {
-    const result = await prisma.user.updateMany({
-      where: { tipo: 'passageiro' },
-      data: { metodoPagamentoPadrao: null }
-    });
-    res.json({ message: `${result.count} passageiros atualizados` });
-  } catch (error) {
-    console.error('Erro ao limpar métodos:', error);
-    res.status(500).json({ erro: 'Erro ao limpar métodos' });
-  }
-});
+// --- ROTA DE LOGIN ---
+router.post('/login', async (req, res) => {
+    try {
+        const { email, senha } = req.body;
 
-// Endpoint debug - Verificar dados do usuário
-router.get('/debug-usuario/:email', verificarAdmin, async (req, res) => {
-  try {
-    const { email } = req.params;
-    const usuario = await prisma.user.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        nome: true,
-        email: true,
-        tipo: true,
-        metodoPagamentoPadrao: true,
-        notificacoesAtivas: true
-      }
-    });
-    res.json(usuario || { erro: 'Usuário não encontrado' });
-  } catch (error) {
-    console.error('Erro ao buscar usuário:', error);
-    res.status(500).json({ erro: 'Erro ao buscar usuário' });
-  }
-});
+        // CORREÇÃO: De 'user' para 'usuario'
+        const usuario = await prisma.usuario.findUnique({
+            where: { email }
+        });
 
-// Endpoint debug - Listar todos usuários
-router.get('/listar-usuarios', verificarAdmin, async (req, res) => {
-  try {
-    const usuarios = await prisma.user.findMany({
-      select: {
-        id: true,
-        nome: true,
-        email: true,
-        tipo: true,
-        metodoPagamentoPadrao: true
-      },
-      orderBy: [
-        { tipo: 'asc' },
-        { email: 'asc' }
-      ]
-    });
-    res.json(usuarios);
-  } catch (error) {
-    console.error('Erro ao listar usuários:', error);
-    res.status(500).json({ erro: 'Erro ao listar usuários' });
-  }
+        if (!usuario) {
+            return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
+        }
+
+        const senhaValida = await bcrypt.compare(senha, usuario.senha);
+        if (!senhaValida) {
+            return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
+        }
+
+        const token = jwt.sign(
+            { id: usuario.id, tipo: usuario.tipo },
+            process.env.JWT_SECRET || 'chave_reserva',
+            { expiresIn: '7d' }
+        );
+
+        res.json({
+            token,
+            usuario: { id: usuario.id, nome: usuario.nome, tipo: usuario.tipo }
+        });
+
+    } catch (error) {
+        console.error("Erro no login:", error);
+        res.status(500).json({ error: 'Erro ao realizar login.' });
+    }
 });
 
 module.exports = router;
