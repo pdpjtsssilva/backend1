@@ -18,73 +18,72 @@ function calcularDistancia(lat1, lon1, lat2, lon2) {
 
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    return R * c; 
+    return R * c; // Retorno em metros
 }
 
 const initializeWebSocket = (server) => {
-    // Inicializa o Socket.io usando o servidor HTTP
     const io = new Server(server, {
         cors: {
-            origin: "*", // Permite conexões de qualquer origem (ajuste em produção se necessário)
+            origin: "*",
             methods: ["GET", "POST"]
         }
     });
 
     io.on('connection', (socket) => {
-        console.log(`[SOCKET] Novo cliente conectado: ${socket.id}`);
+        console.log(`[SOCKET] Novo dispositivo conectado: ${socket.id}`);
 
-        socket.on('atualizar_localizacao_motorista', async (dados) => {
-            const { idMotorista, latitude, longitude, idCorrida } = dados;
+        // Evento disparado pelo App do Motorista
+        socket.on('motorista:atualizarPosicao', async (dados) => {
+            const { motoristaId, latitude, longitude, corridaId } = dados;
 
             try {
-                // Busca a corrida no banco (nomes em português conforme o novo schema)
-                const corrida = await prisma.usuario.findUnique({
-                    where: { id: idCorrida }, // Ajuste aqui se a relação for direta
-                });
-                
-                // Nota: Usando a lógica de busca de Corrida que definimos
-                const corridaAtiva = await prisma.corrida.findUnique({
-                    where: { id: idCorrida },
+                // Busca a corrida usando os nomes EXATOS do seu schema.prisma
+                const corrida = await prisma.corrida.findUnique({
+                    where: { id: corridaId },
                     select: {
-                        latitude_origem: true,
-                        longitude_origem: true,
-                        id_passageiro: true,
+                        origemLat: true,
+                        origemLng: true,
+                        passageiroId: true,
                         status: true
                     }
                 });
 
-                if (corridaAtiva && corridaAtiva.status === 'ACEITA') {
-                    // 1. Repassa a localização para o passageiro
-                    io.to(corridaAtiva.id_passageiro).emit('posicao_motorista', {
+                // Se a corrida existe e está aceita, processamos a localização
+                if (corrida && corrida.status === 'aceita') {
+                    
+                    // 1. Repassa a posição em tempo real para o passageiro
+                    // O canal é o ID do passageiro para garantir privacidade
+                    io.to(corrida.passageiroId).emit('corrida:posicaoMotorista', {
                         latitude,
                         longitude
                     });
 
-                    // 2. Geofencing (Cerca Virtual de 200m)
+                    // 2. GEOFENCING: Verifica se está a menos de 200 metros da ORIGEM
                     const distancia = calcularDistancia(
                         latitude,
                         longitude,
-                        corridaAtiva.latitude_origem,
-                        corridaAtiva.longitude_origem
+                        corrida.origemLat,
+                        corrida.origemLng
                     );
 
                     if (distancia < 200) {
-                        io.to(corridaAtiva.id_passageiro).emit('motorista_chegando', {
-                            mensagem: "Seu motorista está chegando ao local!",
+                        io.to(corrida.passageiroId).emit('corrida:motoristaChegando', {
+                            mensagem: "Seu motorista está chegando!",
                             distancia: Math.round(distancia)
                         });
+                        console.log(`[GEOFENCE] Alerta enviado: Motorista a ${Math.round(distancia)}m`);
                     }
                 }
             } catch (error) {
-                console.error('[SOCKET ERROR] Erro ao processar localização:', error);
+                console.error("[SOCKET ERROR] Erro ao processar GPS:", error);
             }
         });
 
         socket.on('disconnect', () => {
-            console.log(`[SOCKET] Cliente desconectado: ${socket.id}`);
+            console.log(`[SOCKET] Dispositivo desconectado: ${socket.id}`);
         });
     });
 };
 
-// EXPORTAÇÃO IMPORTANTE: Deve ser um objeto contendo a função
+// Exportação correta para bater com o seu server.js
 module.exports = { initializeWebSocket };
