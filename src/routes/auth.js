@@ -1,5 +1,5 @@
 ﻿const express = require('express');
-const router = express.Router(); // Esta é a linha que estava faltando!
+const router = express.Router(); // <--- LINHA ESSENCIAL: Resolve o ReferenceError
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
@@ -11,7 +11,7 @@ router.post('/cadastro', async (req, res) => {
     try {
         const { nome, email, senha, telefone, tipo } = req.body;
 
-        // Verifica se o usuário já existe na tabela 'usuario'
+        // 1. Verifica se o usuário já existe na tabela 'usuario'
         const usuarioExiste = await prisma.usuario.findUnique({
             where: { email }
         });
@@ -20,14 +20,15 @@ router.post('/cadastro', async (req, res) => {
             return res.status(400).json({ error: 'Este e-mail já está em uso.' });
         }
 
-        // Criptografia da senha
+        // 2. Criptografia da senha
         const salt = await bcrypt.genSalt(10);
         const senhaHash = await bcrypt.hash(senha, salt);
 
-        // Converte o tipo para MAIÚSCULO para bater com o Enum do Prisma (PASSAGEIRO/MOTORISTA)
+        // 3. TRATAMENTO DO ENUM: Converte para MAIÚSCULO (Resolve o PrismaClientValidationError)
+        // Isso garante que 'passageiro' vire 'PASSAGEIRO'
         const tipoEnum = tipo ? tipo.toUpperCase() : 'PASSAGEIRO';
 
-        // Criação do novo usuário
+        // 4. Criação do novo usuário
         const novoUsuario = await prisma.usuario.create({
             data: {
                 nome,
@@ -44,8 +45,11 @@ router.post('/cadastro', async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Erro no processo de cadastro:", error);
-        res.status(500).json({ error: 'Erro interno ao realizar cadastro.' });
+        console.error("Erro detalhado no cadastro:", error);
+        res.status(500).json({ 
+            error: 'Erro interno ao realizar cadastro.',
+            details: error.message 
+        });
     }
 });
 
