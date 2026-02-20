@@ -344,4 +344,49 @@ router.post('/limpar-metodos-passageiros', verificarAdmin, async (req, res) => {
   }
 });
 
+// Endpoint debug - Verificar dados do usuário
+router.get('/debug-usuario/:email', verificarAdmin, async (req, res) => {
+  try {
+    const { email } = req.params;
+    const usuario = await prisma.user.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+        tipo: true,
+        metodoPagamentoPadrao: true,
+        notificacoesAtivas: true
+      }
+    });
+    res.json(usuario || { erro: 'Usuário não encontrado' });
+  } catch (error) {
+    console.error('Erro ao buscar usuário:', error);
+    res.status(500).json({ erro: 'Erro ao buscar usuário' });
+  }
+});
+
+// Endpoint debug - Listar todos usuários
+router.get('/listar-usuarios', verificarAdmin, async (req, res) => {
+  try {
+    const usuarios = await prisma.user.findMany({
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+        tipo: true,
+        metodoPagamentoPadrao: true
+      },
+      orderBy: [
+        { tipo: 'asc' },
+        { email: 'asc' }
+      ]
+    });
+    res.json(usuarios);
+  } catch (error) {
+    console.error('Erro ao listar usuários:', error);
+    res.status(500).json({ erro: 'Erro ao listar usuários' });
+  }
+});
+
 module.exports = router;
