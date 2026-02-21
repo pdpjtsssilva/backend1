@@ -4,12 +4,13 @@ const http = require('http');
 const cors = require('cors');
 require('dotenv').config();
 
-// Importação da lógica de WebSocket (usando chaves para bater com o objeto exportado)
+// Importação da lógica de WebSocket
 const { initializeWebSocket } = require('./websocket'); 
 
-// Importação das rotas (Garantindo os caminhos padrão do seu projeto)
+// Importação das rotas
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const corridasRoutes = require('./routes/corridas');
 
 const app = express();
 const server = http.createServer(app);
@@ -20,16 +21,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // 1. Servir o Painel Admin (Arquivos Estáticos)
-// Permite que você acesse o painel via navegador em /admin
 app.use('/admin', express.static(path.join(__dirname, '../admin-panel')));
 
 // 2. Registro das Rotas da API
-// Estas são as rotas que o seu aplicativo mobile e o painel vão chamar
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/corridas', corridasRoutes);
 
 // 3. Inicialização do WebSocket
-// Passamos o servidor HTTP para que o Socket.io funcione na mesma porta
 initializeWebSocket(server);
 
 // Rota de teste para verificar se o servidor está online
