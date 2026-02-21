@@ -4,7 +4,7 @@ const prisma = require('../lib/prisma'); // ← Prisma singleton
 const { emitirNovaSolicitacaoParaMotoristas } = require('../websocket');
 const axios = require('axios');
 
-const GOOGLE_MAPS_KEY = process.env.GOOGLE_MAPS_KEY || '';
+const GOOGLE_MAPS_KEY = process.env.GOOGLE_MAPS_KEY || 'AIzaSyB4C6Xnxmme3HU0_W6hVlLoprRwmw96o3I';
 
 const ensureGoogleKey = (res) => {
   if (!GOOGLE_MAPS_KEY) {

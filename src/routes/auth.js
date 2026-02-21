@@ -1,74 +1,59 @@
-﻿const express = require('express');
-const router = express.Router(); // <--- LINHA ESSENCIAL: Resolve o ReferenceError
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
-
-// --- ROTA DE CADASTRO ---
-router.post('/cadastro', async (req, res) => {
-    try {
-        const { nome, email, senha, telefone, tipo } = req.body;
-
-        // 1. Verifica se o usuário já existe na tabela 'usuario'
-        const usuarioExiste = await prisma.usuario.findUnique({
-            where: { email }
+﻿ const usuarioExiste = await prisma.usuario.findUnique({
+            where: { email: email.toLowerCase() }
         });
 
         if (usuarioExiste) {
             return res.status(400).json({ error: 'Este e-mail já está em uso.' });
         }
 
-        // 2. Criptografia da senha
         const salt = await bcrypt.genSalt(10);
         const senhaHash = await bcrypt.hash(senha, salt);
 
-        // 3. TRATAMENTO DO ENUM: Converte para MAIÚSCULO (Resolve o PrismaClientValidationError)
-        // Isso garante que 'passageiro' vire 'PASSAGEIRO'
-        const tipoEnum = tipo ? tipo.toUpperCase() : 'PASSAGEIRO';
+        // Define o tipo com base na escolha do usuário, padrão PASSAGEIRO
+        const tipoFinal = (tipo && tipo.toLowerCase() === 'motorista') ? 'MOTORISTA' : 'PASSAGEIRO';
 
-        // 4. Criação do novo usuário
         const novoUsuario = await prisma.usuario.create({
             data: {
                 nome,
-                email,
+                email: email.toLowerCase(),
                 senha: senhaHash,
                 telefone,
-                tipo: tipoEnum
+                tipo: tipoFinal
             }
         });
 
+        const token = jwt.sign(
+            { id: novoUsuario.id, tipo: novoUsuario.tipo },
+            process.env.JWT_SECRET || 'l-europe-secret-key',
+            { expiresIn: '7d' }
+        );
+
         res.status(201).json({
-            message: 'Usuário cadastrado com sucesso!',
-            usuario: { id: novoUsuario.id, nome: novoUsuario.nome }
+            message: 'Cadastro realizado com sucesso!',
+            token,
+            usuario: { id: novoUsuario.id, nome: novoUsuario.nome, tipo: novoUsuario.tipo }
         });
 
     } catch (error) {
-        console.error("Erro detalhado no cadastro:", error);
-        res.status(500).json({ 
-            error: 'Erro interno ao realizar cadastro.',
-            details: error.message 
-        });
+        console.error("Erro no cadastro:", error);
+        res.status(500).json({ error: 'Erro interno ao realizar cadastro.' });
     }
 });
 
-// --- ROTA DE LOGIN ---
 router.post('/login', async (req, res) => {
     try {
         const { email, senha } = req.body;
-
-        const usuario = await prisma.usuario.findUnique({
-            where: { email }
+        const usuario = await prisma.usuario.findUnique({ 
+            where: { email: email.toLowerCase() } 
         });
 
         if (!usuario) {
-            return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
+            return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
         }
 
         const senhaValida = await bcrypt.compare(senha, usuario.senha);
         if (!senhaValida) {
-            return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
+            return res.status(401).json({ error: 'E-mail ou senha incorretos.' });
         }
 
         const token = jwt.sign(
@@ -79,17 +64,11 @@ router.post('/login', async (req, res) => {
 
         res.json({
             token,
-            usuario: {
-                id: usuario.id,
-                nome: usuario.nome,
-                email: usuario.email,
-                tipo: usuario.tipo
-            }
+            usuario: { id: usuario.id, nome: usuario.nome, tipo: usuario.tipo }
         });
-
     } catch (error) {
-        console.error("Erro no processo de login:", error);
-        res.status(500).json({ error: 'Erro interno ao realizar login.' });
+        console.error("Erro no login:", error);
+        res.status(500).json({ error: 'Erro ao realizar login.' });
     }
 });
 
