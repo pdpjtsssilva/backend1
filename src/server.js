@@ -11,6 +11,7 @@ const { initializeWebSocket } = require('./websocket');
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const corridasRoutes = require('./routes/corridas');
+const pagamentosRoutes = require('./routes/pagamentos');
 
 const app = express();
 const server = http.createServer(app);
@@ -27,6 +28,7 @@ app.use('/admin', express.static(path.join(__dirname, '../admin-panel')));
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/corridas', corridasRoutes);
+app.use('/api/pagamentos', pagamentosRoutes);
 
 // 3. Inicialização do WebSocket
 initializeWebSocket(server);
