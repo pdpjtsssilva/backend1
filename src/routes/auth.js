@@ -6,13 +6,6 @@ const prisma = require('../lib/prisma');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'l-europe-secret-key';
 
-// Detecta qual modelo usar (user ou usuario)
-const getModel = () => {
-  if (prisma.user) return prisma.user;
-  if (prisma.usuario) return prisma.usuario;
-  throw new Error('Nenhum modelo de usuario encontrado');
-};
-
 // CADASTRO
 router.post('/cadastro', async (req, res) => {
     try {
@@ -21,10 +14,8 @@ router.post('/cadastro', async (req, res) => {
         if (!nome || !email || !senha) {
             return res.status(400).json({ error: 'Nome, e-mail e senha são obrigatórios.' });
         }
-
-        const model = getModel();
         
-        const usuarioExiste = await model.findUnique({
+        const usuarioExiste = await prisma.user.findUnique({
             where: { email: email.toLowerCase() }
         });
 
@@ -37,7 +28,7 @@ router.post('/cadastro', async (req, res) => {
 
         const tipoFinal = (tipo && tipo.toLowerCase() === 'motorista') ? 'motorista' : 'passageiro';
 
-        const novoUsuario = await model.create({
+        const novoUsuario = await prisma.user.create({
             data: {
                 nome,
                 email: email.toLowerCase(),
@@ -74,9 +65,7 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ error: 'E-mail e senha são obrigatórios.' });
         }
 
-        const model = getModel();
-
-        const usuario = await model.findUnique({ 
+        const usuario = await prisma.user.findUnique({ 
             where: { email: email.toLowerCase() } 
         });
 
