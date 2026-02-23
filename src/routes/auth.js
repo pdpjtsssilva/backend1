@@ -99,4 +99,59 @@ router.post('/login', async (req, res) => {
     }
 });
 
+// ATUALIZAR PERFIL
+router.put('/atualizar/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { nome, email, telefone, documento, senha } = req.body || {};
+
+        const usuario = await prisma.user.findUnique({ where: { id } });
+        if (!usuario) {
+            return res.status(404).json({ erro: 'Usuario nao encontrado' });
+        }
+
+        if (email && email.toLowerCase() !== usuario.email) {
+            const existente = await prisma.user.findUnique({
+                where: { email: email.toLowerCase() }
+            });
+            if (existente) {
+                return res.status(400).json({ erro: 'Este e-mail ja esta em uso.' });
+            }
+        }
+
+        const data = {};
+        if (typeof nome !== 'undefined') data.nome = nome;
+        if (typeof email !== 'undefined') data.email = email.toLowerCase();
+        if (typeof telefone !== 'undefined') data.telefone = telefone;
+        if (typeof documento !== 'undefined') data.documento = documento;
+        if (senha) {
+            const salt = await bcrypt.genSalt(10);
+            data.senha = await bcrypt.hash(senha, salt);
+        }
+
+        const atualizado = await prisma.user.update({
+            where: { id },
+            data,
+            select: {
+                id: true,
+                nome: true,
+                email: true,
+                telefone: true,
+                documento: true,
+                tipo: true,
+                cnhFrenteUri: true,
+                cnhVersoUri: true,
+                cnhStatus: true,
+                statusConta: true,
+                suspensoAte: true
+            }
+        });
+
+        res.json(atualizado);
+    } catch (error) {
+        console.error("Erro ao atualizar perfil:", error.message);
+        res.status(500).json({ erro: 'Erro ao atualizar perfil.', details: error.message });
+    }
+});
+
 module.exports = router;

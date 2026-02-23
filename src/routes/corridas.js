@@ -1,6 +1,6 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
-const prisma = require('../lib/prisma'); // ← Prisma singleton
+const prisma = require('../lib/prisma'); // â† Prisma singleton
 const { emitirNovaSolicitacaoParaMotoristas } = require('../websocket');
 const axios = require('axios');
 
@@ -8,7 +8,7 @@ const GOOGLE_MAPS_KEY = process.env.GOOGLE_MAPS_KEY || 'AIzaSyB4C6Xnxmme3HU0_W6h
 
 const ensureGoogleKey = (res) => {
   if (!GOOGLE_MAPS_KEY) {
-    res.status(500).json({ erro: 'Chave Google Maps não configurada' });
+    res.status(500).json({ erro: 'Chave Google Maps nÃ£o configurada' });
     return false;
   }
   return true;
@@ -24,7 +24,7 @@ router.post('/solicitar', async (req, res) => {
     }
     console.log('Nova corrida solicitada (HTTP):', { passageiroId });
 
-    // Calcular distância aproximada (Haversine)
+    // Calcular distÃ¢ncia aproximada (Haversine)
     const R = 6371;
     const dLat = (destinoLat - origemLat) * Math.PI / 180;
     const dLon = (destinoLng - origemLng) * Math.PI / 180;
@@ -34,7 +34,7 @@ router.post('/solicitar', async (req, res) => {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distancia = R * c;
 
-    // Calcular preço (R$ 2 base + R$ 1.50 por km)
+    // Calcular preÃ§o (R$ 2 base + R$ 1.50 por km)
     const preco = 2 + (distancia * 1.5);
 
     const corrida = await prisma.corrida.create({
@@ -52,7 +52,7 @@ router.post('/solicitar', async (req, res) => {
       }
     });
 
-    // Limpar método de pagamento para forçar escolha na próxima corrida
+    // Limpar mÃ©todo de pagamento para forÃ§ar escolha na prÃ³xima corrida
     await prisma.user.update({
       where: { id: passageiroId },
       data: { metodoPagamentoPadrao: null }
@@ -110,7 +110,7 @@ router.post('/rota', async (req, res) => {
         }))
       });
     } else {
-      res.status(400).json({ erro: 'Não foi possível calcular a rota' });
+      res.status(400).json({ erro: 'NÃ£o foi possÃ­vel calcular a rota' });
     }
   } catch (error) {
     console.error('Erro ao buscar rota:', error);
@@ -118,7 +118,7 @@ router.post('/rota', async (req, res) => {
   }
 });
 
-// BUSCAR ENDEREÇO (Autocomplete)
+// BUSCAR ENDEREÃ‡O (Autocomplete)
 router.get('/buscar-endereco', async (req, res) => {
   try {
     const { input } = req.query;
@@ -144,8 +144,8 @@ router.get('/buscar-endereco', async (req, res) => {
       res.json([]);
     }
   } catch (error) {
-    console.error('Erro ao buscar endereço:', error.message);
-    res.status(500).json({ erro: 'Erro ao buscar endereço' });
+    console.error('Erro ao buscar endereÃ§o:', error.message);
+    res.status(500).json({ erro: 'Erro ao buscar endereÃ§o' });
   }
 });
 
@@ -155,7 +155,7 @@ router.get('/lugar-coordenadas', async (req, res) => {
     const { placeId } = req.query;
 
     if (!placeId) {
-      return res.status(400).json({ erro: 'Place ID é obrigatório' });
+      return res.status(400).json({ erro: 'Place ID Ã© obrigatÃ³rio' });
     }
 
     if (!ensureGoogleKey(res)) return;
@@ -170,7 +170,7 @@ router.get('/lugar-coordenadas', async (req, res) => {
         longitude: location.lng
       });
     } else {
-      res.status(400).json({ erro: 'Não foi possível obter as coordenadas' });
+      res.status(400).json({ erro: 'NÃ£o foi possÃ­vel obter as coordenadas' });
     }
   } catch (error) {
     console.error('Erro ao buscar coordenadas:', error);
@@ -178,7 +178,7 @@ router.get('/lugar-coordenadas', async (req, res) => {
   }
 });
 
-// LISTAR CORRIDAS DO USUÁRIO
+// LISTAR CORRIDAS DO USUÃRIO
 router.get('/usuario/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -196,6 +196,33 @@ router.get('/usuario/:id', async (req, res) => {
   }
 });
 
+// LISTAR CORRIDAS ABERTAS (fallback para motoristas)
+router.get('/abertas', async (_req, res) => {
+  try {
+    const corridas = await prisma.corrida.findMany({
+      where: { status: 'aguardando', motoristaId: null },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: { passageiro: { select: { id: true, nome: true } } }
+    });
+
+    const payload = corridas.map((c) => ({
+      corridaId: c.id,
+      passageiroId: c.passageiroId,
+      passageiroNome: c.passageiro?.nome || null,
+      origem: { latitude: c.origemLat, longitude: c.origemLng },
+      destino: { latitude: c.destinoLat, longitude: c.destinoLng },
+      origemEndereco: c.origemEndereco,
+      destinoEndereco: c.destinoEndereco,
+      preco: c.preco
+    }));
+
+    res.json(payload);
+  } catch (error) {
+    console.error('Erro ao buscar corridas abertas:', error);
+    res.status(500).json({ erro: 'Erro ao buscar corridas abertas' });
+  }
+});
 // LISTAR CORRIDAS DO MOTORISTA
 router.get('/motorista/:id', async (req, res) => {
   try {
@@ -247,17 +274,17 @@ router.patch('/:id/cancelar', async (req, res) => {
   }
 });
 
-// ACEITAR CORRIDA (Motorista) - CORRIGIDO COM TRANSAÇÃO
+// ACEITAR CORRIDA (Motorista) - CORRIGIDO COM TRANSAÃ‡ÃƒO
 router.patch('/:id/aceitar', async (req, res) => {
   try {
     const { id } = req.params;
     const { motoristaId } = req.body;
 
     if (!motoristaId) {
-      return res.status(400).json({ erro: 'MotoristaId é obrigatório' });
+      return res.status(400).json({ erro: 'MotoristaId Ã© obrigatÃ³rio' });
     }
 
-    // Usa transação para evitar race condition
+    // Usa transaÃ§Ã£o para evitar race condition
     const corrida = await prisma.$transaction(async (tx) => {
       // 1. Busca a corrida atual
       const corridaAtual = await tx.corrida.findUnique({
@@ -272,7 +299,7 @@ router.patch('/:id/aceitar', async (req, res) => {
         throw new Error('CORRIDA_JA_ACEITA');
       }
 
-      // 2. Atualiza a corrida dentro da transação
+      // 2. Atualiza a corrida dentro da transaÃ§Ã£o
       return await tx.corrida.update({
         where: { id },
         data: {
@@ -285,10 +312,10 @@ router.patch('/:id/aceitar', async (req, res) => {
     res.json(corrida);
   } catch (error) {
     if (error.message === 'CORRIDA_NAO_ENCONTRADA') {
-      return res.status(404).json({ erro: 'Corrida não encontrada' });
+      return res.status(404).json({ erro: 'Corrida nÃ£o encontrada' });
     }
     if (error.message === 'CORRIDA_JA_ACEITA') {
-      return res.status(409).json({ erro: 'Corrida não está mais disponível para aceite' });
+      return res.status(409).json({ erro: 'Corrida nÃ£o estÃ¡ mais disponÃ­vel para aceite' });
     }
     console.error('Erro ao aceitar corrida:', error);
     res.status(500).json({ erro: 'Erro ao aceitar corrida' });
@@ -300,14 +327,14 @@ router.patch('/:id/finalizar', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Buscar corrida com informações do motorista
+    // Buscar corrida com informaÃ§Ãµes do motorista
     const corrida = await prisma.corrida.findUnique({
       where: { id },
       include: { passageiro: true }
     });
 
     if (!corrida) {
-      return res.status(404).json({ erro: 'Corrida não encontrada' });
+      return res.status(404).json({ erro: 'Corrida nÃ£o encontrada' });
     }
 
     if (!corrida.motoristaId) {
@@ -331,7 +358,7 @@ router.patch('/:id/finalizar', async (req, res) => {
       });
     }
 
-    // Calcular valores (comissão de 20%)
+    // Calcular valores (comissÃ£o de 20%)
     const TAXA_COMISSAO = 0.20;
     const valorTotal = corrida.preco;
     const comissao = valorTotal * TAXA_COMISSAO;
@@ -340,7 +367,7 @@ router.patch('/:id/finalizar', async (req, res) => {
     const saldoAnterior = carteira.saldo;
     const saldoNovo = saldoAnterior + valorMotorista;
 
-    // Criar transação de crédito para o motorista
+    // Criar transaÃ§Ã£o de crÃ©dito para o motorista
     await prisma.transacao.create({
       data: {
         userId: corrida.motoristaId,
@@ -356,13 +383,13 @@ router.patch('/:id/finalizar', async (req, res) => {
       }
     });
 
-    // Criar transação de débito (comissão da plataforma)
+    // Criar transaÃ§Ã£o de dÃ©bito (comissÃ£o da plataforma)
     await prisma.transacao.create({
       data: {
         userId: corrida.motoristaId,
         tipo: 'debito',
         valor: comissao,
-        descricao: `Comissão (20%) - Corrida ${id.substring(0, 8)}`,
+        descricao: `ComissÃ£o (20%) - Corrida ${id.substring(0, 8)}`,
         categoria: 'comissao',
         metodoPagamento: corrida.metodoPagamento || 'app',
         status: 'aprovada',
@@ -378,7 +405,7 @@ router.patch('/:id/finalizar', async (req, res) => {
       data: { saldo: saldoNovo }
     });
 
-    // Limpar método de pagamento do passageiro para próxima corrida
+    // Limpar mÃ©todo de pagamento do passageiro para prÃ³xima corrida
     await prisma.user.update({
       where: { id: corrida.passageiroId },
       data: { metodoPagamentoPadrao: null }

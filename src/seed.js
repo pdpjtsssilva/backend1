@@ -1,4 +1,4 @@
-const { PrismaClient } = require('@prisma/client');
+﻿const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
 const prisma = new PrismaClient();
@@ -6,18 +6,34 @@ const prisma = new PrismaClient();
 async function main() {
   const senhaHash = await bcrypt.hash('123456', 10);
 
-  const user = await prisma.user.upsert({
-    where: { email: 'teste@email.com' },
+  const passageiro = await prisma.user.upsert({
+    where: { email: 'passageiro@demo.com' },
     update: {},
     create: {
-      nome: 'Usuário Teste',
-      email: 'teste@email.com',
+      nome: 'Passageiro Demo',
+      email: 'passageiro@demo.com',
       senha: senhaHash,
-      telefone: '1234567890'
+      telefone: '11999990000',
+      tipo: 'passageiro'
     }
   });
 
-  console.log('Usuário de seed pronto:', user.email);
+  const motorista = await prisma.user.upsert({
+    where: { email: 'motorista@demo.com' },
+    update: {},
+    create: {
+      nome: 'Motorista Demo',
+      email: 'motorista@demo.com',
+      senha: senhaHash,
+      telefone: '11999990001',
+      tipo: 'motorista',
+      cnhStatus: 'aprovado'
+    }
+  });
+
+  console.log('Seed concluido:');
+  console.log('Passageiro:', passageiro.email);
+  console.log('Motorista:', motorista.email);
 }
 
 main()
