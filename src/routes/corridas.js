@@ -202,14 +202,13 @@ router.get('/abertas', async (_req, res) => {
     const corridas = await prisma.corrida.findMany({
       where: { status: 'aguardando', motoristaId: null },
       orderBy: { createdAt: 'desc' },
-      take: 5,
-      include: { passageiro: { select: { id: true, nome: true } } }
+      take: 5
     });
 
     const payload = corridas.map((c) => ({
       corridaId: c.id,
       passageiroId: c.passageiroId,
-      passageiroNome: c.passageiro?.nome || null,
+      passageiroNome: null,
       origem: { latitude: c.origemLat, longitude: c.origemLng },
       destino: { latitude: c.destinoLat, longitude: c.destinoLng },
       origemEndereco: c.origemEndereco,
@@ -220,7 +219,7 @@ router.get('/abertas', async (_req, res) => {
     res.json(payload);
   } catch (error) {
     console.error('Erro ao buscar corridas abertas:', error);
-    res.status(500).json({ erro: 'Erro ao buscar corridas abertas' });
+    res.status(500).json({ erro: 'Erro ao buscar corridas abertas', detalhe: error.message });
   }
 });
 // LISTAR CORRIDAS DO MOTORISTA
