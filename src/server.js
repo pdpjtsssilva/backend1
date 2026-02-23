@@ -43,6 +43,19 @@ app.use('/api/carros', carrosRoutes);
 // WebSocket init
 initializeWebSocket(server);
 
+// Log DB host for debugging (no credentials)
+try {
+  const dbUrl = process.env.DATABASE_URL;
+  if (dbUrl) {
+    const parsed = new URL(dbUrl);
+    console.log(`DB HOST: ${parsed.host} | DB NAME: ${parsed.pathname.replace('/', '')}`);
+  } else {
+    console.log('DB HOST: (DATABASE_URL ausente)');
+  }
+} catch (err) {
+  console.log('DB HOST: (erro ao ler DATABASE_URL)');
+}
+
 // Status check
 app.get('/api/status', (req, res) => {
   res.json({
