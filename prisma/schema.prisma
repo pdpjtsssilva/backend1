@@ -7,6 +7,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 // ========================================
@@ -131,8 +132,8 @@ model Transacao {
   status        String   @default("aprovada") // aprovada, pendente, reembolsada
   referencia    String?  // corridaId ou outro
   gatewayId     String?  // payment intent, etc
-  saldoAnterior Float?
-  saldoNovo     Float?
+  saldoAnterior Float
+  saldoNovo     Float
   createdAt     DateTime @default(now())
   
   usuario       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
