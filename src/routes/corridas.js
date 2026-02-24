@@ -1,7 +1,7 @@
 ﻿const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma'); // â† Prisma singleton
-const { emitirNovaSolicitacaoParaMotoristas } = require('../websocket');
+const { emitirNovaSolicitacaoParaMotoristas, corridasAtivas } = require('../websocket');
 const axios = require('axios');
 
 const GOOGLE_MAPS_KEY = process.env.GOOGLE_MAPS_KEY || 'AIzaSyB4C6Xnxmme3HU0_W6hVlLoprRwmw96o3I';
@@ -199,22 +199,19 @@ router.get('/usuario/:id', async (req, res) => {
 // LISTAR CORRIDAS ABERTAS (fallback para motoristas)
 router.get('/abertas', async (_req, res) => {
   try {
-    const corridas = await prisma.corrida.findMany({
-      where: { status: 'aguardando', motoristaId: null },
-      orderBy: { createdAt: 'desc' },
-      take: 5
-    });
-
-    const payload = corridas.map((c) => ({
-      corridaId: c.id,
-      passageiroId: c.passageiroId,
-      passageiroNome: null,
-      origem: { latitude: c.origemLat, longitude: c.origemLng },
-      destino: { latitude: c.destinoLat, longitude: c.destinoLng },
-      origemEndereco: c.origemEndereco,
-      destinoEndereco: c.destinoEndereco,
-      preco: c.preco
-    }));
+    const payload = Array.from(corridasAtivas.values())
+      .filter((c) => c && c.status === 'aguardando')
+      .slice(0, 5)
+      .map((c) => ({
+        corridaId: c.corridaId,
+        passageiroId: c.passageiroId,
+        passageiroNome: c.passageiroNome || null,
+        origem: c.origem,
+        destino: c.destino,
+        origemEndereco: c.origemEndereco,
+        destinoEndereco: c.destinoEndereco,
+        preco: c.preco
+      }));
 
     res.json(payload);
   } catch (error) {

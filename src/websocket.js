@@ -382,4 +382,4 @@ function initializeWebSocket(server) {
   console.log('WS Server inicializado!');
 }
 
-module.exports = { initializeWebSocket, motoristasOnline, emitirNovaSolicitacaoParaMotoristas };
+module.exports = { initializeWebSocket, motoristasOnline, corridasAtivas, emitirNovaSolicitacaoParaMotoristas };
