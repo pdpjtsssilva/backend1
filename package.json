@@ -1,24 +1,35 @@
 {
-  "name": "backend-leurope",
+  "name": "backend",
   "version": "1.0.0",
-  "description": "Backend Uber Clone L'europe",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node scripts/prisma-deploy-retry.js && node src/server.js",
     "dev": "nodemon src/server.js",
-    "build": "npx prisma generate"
+    "postinstall": "prisma generate",
+    "prisma:deploy": "prisma migrate deploy",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
   "dependencies": {
     "@prisma/client": "^5.22.0",
-    "bcryptjs": "^2.4.3",
+    "axios": "^1.13.2",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.7.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.2",
-    "socket.io": "^4.7.2"
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.0.2",
+    "prisma": "^5.22.0",
+    "socket.io": "^4.8.1",
+    "stripe": "^20.1.0",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1",
-    "prisma": "^5.22.0"
+    "nodemon": "^3.1.11"
   }
 }
