@@ -2,7 +2,11 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const path = require('path');
-require('dotenv').config();
+
+// Ajuste para carregar .env apenas em desenvolvimento
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
 
 const { initializeWebSocket } = require('./websocket');
 
@@ -19,6 +23,12 @@ const server = http.createServer(app);
 
 app.use(cors());
 app.use(express.json());
+
+// Logs de Verificação (Aparecerão no console do Render para diagnóstico)
+console.log("--- Verificação de Ambiente ---");
+console.log("DATABASE_URL configurada:", !!process.env.DATABASE_URL);
+console.log("JWT_SECRET configurada:", !!process.env.JWT_SECRET);
+console.log("-------------------------------");
 
 // Servir Painel Admin
 app.use('/admin', express.static(path.join(__dirname, '../admin-panel')));
@@ -40,6 +50,6 @@ app.get('/api/status', (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, '0.0.0.0', () => {  // ← '0.0.0.0' resolve o erro do Render
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
