@@ -2,7 +2,8 @@ const socketIo = require('socket.io');
 
 const motoristasOnline = new Map();
 
-const setupWebSocket = (server) => {
+// O nome da função deve ser exatamente inicializarWebSocket para bater com o seu server.js
+const inicializarWebSocket = (server) => {
     const io = socketIo(server, {
         cors: {
             origin: "*",
@@ -13,16 +14,14 @@ const setupWebSocket = (server) => {
     io.on('connection', (socket) => {
         console.log(`[SOCKET] Novo dispositivo conectado: ${socket.id}`);
 
-        // --- COMPATIBILIDADE COM O SEU APP MOBILE ---
-
-        // 1. Quando o Motorista fica Online (vê o log no Render agora)
+        // Evento que o seu APK Mobile envia quando o motorista loga
         socket.on('motorista:online', (data) => {
             const { motoristaId, nome, latitude, longitude } = data;
             
-            // Coloca o socket na sala técnica de motoristas
+            // Coloca o socket na sala de motoristas para receber pedidos
             socket.join('motoristas');
             
-            // Salva na memória do servidor
+            // Salva o motorista na memória do servidor
             motoristasOnline.set(socket.id, {
                 motoristaId,
                 nome: nome || 'Motorista',
@@ -31,51 +30,48 @@ const setupWebSocket = (server) => {
             });
 
             console.log(`[SOCKET] Motorista ${nome || motoristaId} pronto para receber chamadas.`);
-            
-            // Avisa outros (opcional, se o seu app usar)
-            io.emit('motorista:online', data);
         });
 
-        // 2. Quando o Passageiro entra no App
+        // Evento que o seu APK Mobile envia quando o passageiro entra
         socket.on('passageiro:entrar', ({ passageiroId }) => {
             socket.join('passageiros');
-            console.log(`[SOCKET] Passageiro ${passageiroId} conectado e aguardando.`);
+            console.log(`[SOCKET] Passageiro ${passageiroId} conectado e na sala.`);
         });
 
-        // 3. Quando o Passageiro solicita a corrida pelo Socket
+        // Evento de solicitação de corrida vindo do Mobile
         socket.on('passageiro:solicitarCorrida', (dados) => {
-            console.log('[CORRIDA] Nova solicitação recebida via Socket:', dados);
+            console.log('[CORRIDA] Nova solicitação recebida:', dados);
             
-            // Envia para TODOS os motoristas que estão na sala 'motoristas'
+            // Envia a notificação apenas para quem está na sala 'motoristas'
             io.to('motoristas').emit('corrida:novaSolicitacao', {
                 ...dados,
-                id: Date.now().toString(), // Gera um ID temporário se não vier um
+                id: dados.id || Date.now().toString(),
                 status: 'aberta'
             });
         });
 
-        // 4. Quando o Motorista aceita a corrida
+        // Evento de aceite de corrida vindo do Mobile
         socket.on('motorista:aceitarCorrida', (data) => {
-            console.log('[CORRIDA] Motorista aceitou:', data);
-            // Avisa o passageiro específico
+            console.log('[CORRIDA] Motorista aceitou o pedido:', data);
+            // Avisa o passageiro (e a todos) que a corrida foi aceita
             io.emit('corrida:aceita', data);
         });
 
-        // 5. Atualização de posição do motorista
+        // Atualização de posição em tempo real
         socket.on('motorista:atualizarPosicao', (data) => {
-            motoristasOnline.set(socket.id, {
-                ...motoristasOnline.get(socket.id),
-                localizacao: { latitude: data.latitude, longitude: data.longitude }
-            });
-            // Opcional: enviar posição para o passageiro em tempo real
+            if (motoristasOnline.has(socket.id)) {
+                motoristasOnline.get(socket.id).localizacao = { 
+                    latitude: data.latitude, 
+                    longitude: data.longitude 
+                };
+            }
             io.emit('motorista:posicaoAtualizada', data);
         });
 
-        // --- DESCONEXÃO ---
         socket.on('disconnect', () => {
             if (motoristasOnline.has(socket.id)) {
                 const motorista = motoristasOnline.get(socket.id);
-                console.log(`[SOCKET] Motorista ${motorista.nome} saiu.`);
+                console.log(`[SOCKET] Motorista ${motorista.nome} desconectado.`);
                 motoristasOnline.delete(socket.id);
             }
             console.log(`[SOCKET] Dispositivo desconectado: ${socket.id}`);
@@ -85,4 +81,5 @@ const setupWebSocket = (server) => {
     return io;
 };
 
-module.exports = setupWebSocket;
+// Exporta com o nome que o server.js está importando
+module.exports = inicializarWebSocket;
