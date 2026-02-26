@@ -1,8 +1,9 @@
 const socketIo = require('socket.io');
 
+// Memória temporária para corridas e motoristas
 const motoristasOnline = new Map();
+const corridasAtivas = new Map();
 
-// Definimos a função com o nome que o seu server.js usa
 const initializeWebSocket = (server) => {
     const io = socketIo(server, {
         cors: {
@@ -12,9 +13,9 @@ const initializeWebSocket = (server) => {
     });
 
     io.on('connection', (socket) => {
-        console.log(`[SOCKET] Novo dispositivo conectado: ${socket.id}`);
+        console.log(`[SOCKET] Dispositivo conectado: ${socket.id}`);
 
-        // Eventos baseados no seu arquivo mobile/src/services/websocket.js
+        // Motorista entra online
         socket.on('motorista:online', (data) => {
             const { motoristaId, nome, latitude, longitude } = data;
             socket.join('motoristas');
@@ -24,29 +25,54 @@ const initializeWebSocket = (server) => {
                 localizacao: { latitude, longitude },
                 socketId: socket.id
             });
-            console.log(`[SOCKET] Motorista ${nome || motoristaId} pronto para receber chamadas.`);
+            console.log(`[SOCKET] Motorista ${nome || motoristaId} pronto.`);
         });
 
+        // Passageiro entra no sistema
         socket.on('passageiro:entrar', ({ passageiroId }) => {
             socket.join('passageiros');
             console.log(`[SOCKET] Passageiro ${passageiroId} conectado.`);
         });
 
+        // Solicitação de corrida
         socket.on('passageiro:solicitarCorrida', (dados) => {
-            console.log('[CORRIDA] Nova solicitação recebida:', dados);
+            const corridaId = dados.id || Date.now().toString();
+            corridasAtivas.set(corridaId, { ...dados, status: 'aguardando' });
+            
+            console.log('[CORRIDA] Nova solicitação:', corridaId);
             io.to('motoristas').emit('corrida:novaSolicitacao', dados);
         });
 
         socket.on('disconnect', () => {
-            if (motoristasOnline.has(socket.id)) {
-                motoristasOnline.delete(socket.id);
-            }
-            console.log(`[SOCKET] Dispositivo desconectado: ${socket.id}`);
+            motoristasOnline.delete(socket.id);
+            console.log(`[SOCKET] Desconectado: ${socket.id}`);
         });
     });
+
+    // Função interna para o arquivo de rotas emitir eventos
+    global.io = io; 
 
     return io;
 };
 
-// EXPORTAÇÃO CORRIGIDA: Exporta como um objeto para o destructuring no server.js funcionar
-module.exports = { initializeWebSocket };
+// --- FUNÇÕES DE SUPORTE PARA AS ROTAS (corridas.js) ---
+
+const getCorridasAtivas = () => {
+    return corridasAtivas;
+};
+
+const emitirNovaSolicitacaoParaMotoristas = (dados) => {
+    if (global.io) {
+        // Guarda na memória para a rota /abertas conseguir listar
+        corridasAtivas.set(dados.corridaId, { ...dados, status: 'aguardando' });
+        // Envia via socket para os motoristas online
+        global.io.to('motoristas').emit('corrida:novaSolicitacao', dados);
+    }
+};
+
+// Exportamos tudo o que o server.js e o corridas.js precisam
+module.exports = { 
+    initializeWebSocket, 
+    getCorridasAtivas, 
+    emitirNovaSolicitacaoParaMotoristas 
+};
