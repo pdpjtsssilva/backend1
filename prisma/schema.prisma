@@ -1,0 +1,45 @@
+// Prisma Schema para o projeto Leurope (backend tipo Uber)
+// Compatível com Prisma 6.2.1 e PostgreSQL ✅
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("PASSENGER")
+  createdAt DateTime @default(now())
+  rides     Ride[]   @relation("UserRides")
+}
+
+model Driver {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  vehicle   String
+  available Boolean  @default(true)
+  createdAt DateTime @default(now())
+  rides     Ride[]   @relation("DriverRides")
+}
+
+model Ride {
+  id          String   @id @default(cuid())
+  origin      String
+  destination String
+  status      String   @default("REQUESTED")
+  price       Float?
+  createdAt   DateTime @default(now())
+  userId      String
+  driverId    String?
+  user        User     @relation("UserRides", fields: [userId], references: [id])
+  driver      Driver?  @relation("DriverRides", fields: [driverId], references: [id])
+}
