@@ -2,6 +2,7 @@
 
 // Memoria temporaria para gerenciar o estado em tempo real
 const motoristasOnline = new Map();
+const passageirosOnline = new Map();
 const corridasAtivas = new Map();
 
 const initializeWebSocket = (server) => {
@@ -36,6 +37,9 @@ const initializeWebSocket = (server) => {
     // Registro de Passageiro
     socket.on('passageiro:entrar', ({ passageiroId }) => {
       socket.join('passageiros');
+      if (passageiroId) {
+        passageirosOnline.set(passageiroId, socket.id);
+      }
       console.log('[SOCKET] passageiro:entrar', { passageiroId });
       console.log(`[SOCKET] Passageiro ${passageiroId} conectado.`);
     });
@@ -43,14 +47,56 @@ const initializeWebSocket = (server) => {
     // Solicitacao inicial via Socket
     socket.on('passageiro:solicitarCorrida', (dados) => {
       const corridaId = dados.id || Date.now().toString();
-      corridasAtivas.set(corridaId, { ...dados, status: 'aguardando' });
+      const passageiroSocket = passageirosOnline.get(dados.passageiroId) || socket.id;
+      corridasAtivas.set(corridaId, { ...dados, corridaId, passageiroSocket, status: 'aguardando' });
       console.log('[CORRIDA] Nova solicitacao:', corridaId);
       console.log('[CORRIDA] Payload:', dados);
       io.to('motoristas').emit('corrida:novaSolicitacao', dados);
     });
 
+    // Motorista aceita corrida
+    socket.on('motorista:aceitarCorrida', (dados) => {
+      const { corridaId, motoristaId, motoristaNome, motoristaLocalizacao } = dados || {};
+      if (!corridaId) return;
+      const atual = corridasAtivas.get(corridaId) || {};
+      const atualizado = {
+        ...atual,
+        motoristaId,
+        motoristaNome,
+        motoristaLocalizacao,
+        status: 'aceita'
+      };
+      corridasAtivas.set(corridaId, atualizado);
+
+      // Notificar passageiro
+      const passageiroSocket = atualizado.passageiroSocket || passageirosOnline.get(atualizado.passageiroId);
+      if (passageiroSocket) {
+        io.to(passageiroSocket).emit('corrida:aceita', {
+          corridaId,
+          motoristaId,
+          motoristaNome,
+          motoristaLocalizacao
+        });
+      } else {
+        io.emit('corrida:aceita', { corridaId, motoristaId, motoristaNome, motoristaLocalizacao });
+      }
+
+      // Confirmar ao motorista
+      io.to(socket.id).emit('motorista:corridaConfirmada', {
+        corridaId,
+        status: 'aceita',
+        destinoLat: atualizado.destino?.latitude,
+        destinoLng: atualizado.destino?.longitude,
+        destinoEndereco: atualizado.destinoEndereco,
+        origemEndereco: atualizado.origemEndereco
+      });
+    });
+
     socket.on('disconnect', () => {
       motoristasOnline.delete(socket.id);
+      passageirosOnline.forEach((sockId, passageiroId) => {
+        if (sockId === socket.id) passageirosOnline.delete(passageiroId);
+      });
       console.log(`[SOCKET] Desconectado: ${socket.id}`);
     });
   });
