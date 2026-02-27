@@ -272,7 +272,7 @@ router.patch('/:id/cancelar', async (req, res) => {
 router.patch('/:id/aceitar', async (req, res) => {
   try {
     const { id } = req.params;
-    const { motoristaId } = req.body;
+    const { motoristaId, motoristaNome, motoristaLocalizacao } = req.body;
 
     if (!motoristaId) {
       return res.status(400).json({ erro: 'MotoristaId e obrigatorio' });
@@ -282,6 +282,16 @@ router.patch('/:id/aceitar', async (req, res) => {
       where: { id },
       data: { status: 'aceita', motoristaId }
     });
+
+    // Fallback: emitir evento para passageiro via WS
+    if (global.io) {
+      global.io.emit('corrida:aceita', {
+        corridaId: id,
+        motoristaId,
+        motoristaNome: motoristaNome || null,
+        motoristaLocalizacao: motoristaLocalizacao || null
+      });
+    }
 
     res.json(corrida);
   } catch (error) {
