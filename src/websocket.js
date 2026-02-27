@@ -92,6 +92,36 @@ const initializeWebSocket = (server) => {
       });
     });
 
+    // Motorista chegou na origem
+    socket.on('motorista:chegouOrigem', (dados) => {
+      const { corridaId } = dados || {};
+      if (!corridaId) return;
+      const atual = corridasAtivas.get(corridaId) || {};
+      const atualizado = { ...atual, status: 'chegou' };
+      corridasAtivas.set(corridaId, atualizado);
+      const passageiroSocket = atualizado.passageiroSocket || passageirosOnline.get(atualizado.passageiroId);
+      if (passageiroSocket) {
+        io.to(passageiroSocket).emit('motorista:chegou', { corridaId });
+      } else {
+        io.emit('motorista:chegou', { corridaId });
+      }
+    });
+
+    // Motorista inicia corrida
+    socket.on('motorista:iniciarCorrida', (dados) => {
+      const { corridaId } = dados || {};
+      if (!corridaId) return;
+      const atual = corridasAtivas.get(corridaId) || {};
+      const atualizado = { ...atual, status: 'em_andamento' };
+      corridasAtivas.set(corridaId, atualizado);
+      const passageiroSocket = atualizado.passageiroSocket || passageirosOnline.get(atualizado.passageiroId);
+      if (passageiroSocket) {
+        io.to(passageiroSocket).emit('corrida:iniciada', { corridaId });
+      } else {
+        io.emit('corrida:iniciada', { corridaId });
+      }
+    });
+
     socket.on('disconnect', () => {
       motoristasOnline.delete(socket.id);
       passageirosOnline.forEach((sockId, passageiroId) => {
