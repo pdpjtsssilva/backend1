@@ -48,7 +48,7 @@ const initializeWebSocket = (server) => {
     socket.on('passageiro:solicitarCorrida', (dados) => {
       const corridaId = dados.id || Date.now().toString();
       const passageiroSocket = passageirosOnline.get(dados.passageiroId) || socket.id;
-      corridasAtivas.set(corridaId, { ...dados, corridaId, passageiroSocket, status: 'aguardando' });
+      corridasAtivas.set(corridaId, { ...dados, corridaId, passageiroSocket, status: 'aguardando', createdAt: Date.now() });
       console.log('[CORRIDA] Nova solicitacao:', corridaId);
       console.log('[CORRIDA] Payload:', dados);
       io.to('motoristas').emit('corrida:novaSolicitacao', dados);
@@ -125,7 +125,13 @@ const initializeWebSocket = (server) => {
     socket.on('disconnect', () => {
       motoristasOnline.delete(socket.id);
       passageirosOnline.forEach((sockId, passageiroId) => {
-        if (sockId === socket.id) passageirosOnline.delete(passageiroId);
+        if (sockId === socket.id) {
+          passageirosOnline.delete(passageiroId);
+          // Remove corridas ativas desse passageiro
+          Array.from(corridasAtivas.entries()).forEach(([cid, c]) => {
+            if (c?.passageiroId === passageiroId) corridasAtivas.delete(cid);
+          });
+        }
       });
       console.log(`[SOCKET] Desconectado: ${socket.id}`);
     });
