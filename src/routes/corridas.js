@@ -14,6 +14,22 @@ const ensureGoogleKey = (res) => {
   return true;
 };
 
+const ensureSelf = (req, res, id) => {
+  if (!req.user || req.user.id !== id) {
+    res.status(403).json({ erro: 'Acesso negado' });
+    return false;
+  }
+  return true;
+};
+
+const ensureTipo = (req, res, tipo) => {
+  if (!req.user || req.user.tipo !== tipo) {
+    res.status(403).json({ erro: 'Acesso negado' });
+    return false;
+  }
+  return true;
+};
+
 // SOLICITAR CORRIDA
 router.post('/solicitar', async (req, res) => {
   try {
@@ -22,6 +38,8 @@ router.post('/solicitar', async (req, res) => {
     if (!passageiroId || !origemLat || !origemLng || !destinoLat || !destinoLng) {
       return res.status(400).json({ erro: 'Dados incompletos' });
     }
+    if (!ensureSelf(req, res, passageiroId)) return;
+    if (!ensureTipo(req, res, 'passageiro')) return;
 
     // Calcular distancia aproximada (Haversine)
     const R = 6371;
@@ -177,6 +195,7 @@ router.get('/lugar-coordenadas', async (req, res) => {
 // LISTAR CORRIDAS ABERTAS (fallback para motoristas)
 router.get('/abertas', async (_req, res) => {
   try {
+    if (!ensureTipo(_req, res, 'motorista')) return;
     const corridasAtivas = getCorridasAtivas();
     const payload = Array.from(corridasAtivas.values())
       .filter((c) => c && c.status === 'aguardando')
@@ -203,6 +222,8 @@ router.get('/abertas', async (_req, res) => {
 router.get('/usuario/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    if (!ensureSelf(req, res, id)) return;
+    if (!ensureTipo(req, res, 'passageiro')) return;
 
     const corridas = await prisma.corrida.findMany({
       where: { passageiroId: id },
@@ -221,6 +242,8 @@ router.get('/usuario/:id', async (req, res) => {
 router.get('/motorista/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    if (!ensureSelf(req, res, id)) return;
+    if (!ensureTipo(req, res, 'motorista')) return;
 
     const corridas = await prisma.corrida.findMany({
       where: { motoristaId: id },
@@ -243,6 +266,9 @@ router.get('/:id', async (req, res) => {
     if (!corrida) {
       return res.status(404).json({ erro: 'Corrida nao encontrada' });
     }
+    if (req.user?.id !== corrida.passageiroId && req.user?.id !== corrida.motoristaId) {
+      return res.status(403).json({ erro: 'Acesso negado' });
+    }
     res.json(corrida);
   } catch (error) {
     console.error('Erro ao buscar corrida:', error);
@@ -255,6 +281,14 @@ router.patch('/:id/cancelar', async (req, res) => {
   try {
     const { id } = req.params;
     const canceladoPor = req.body?.canceladoPor || null;
+
+    const corridaExistente = await prisma.corrida.findUnique({ where: { id } });
+    if (!corridaExistente) {
+      return res.status(404).json({ erro: 'Corrida nao encontrada' });
+    }
+    if (req.user?.id !== corridaExistente.passageiroId && req.user?.id !== corridaExistente.motoristaId) {
+      return res.status(403).json({ erro: 'Acesso negado' });
+    }
 
     const corrida = await prisma.corrida.update({
       where: { id },
@@ -277,6 +311,8 @@ router.patch('/:id/aceitar', async (req, res) => {
     if (!motoristaId) {
       return res.status(400).json({ erro: 'MotoristaId e obrigatorio' });
     }
+    if (!ensureSelf(req, res, motoristaId)) return;
+    if (!ensureTipo(req, res, 'motorista')) return;
 
     const corrida = await prisma.corrida.update({
       where: { id },
@@ -305,6 +341,14 @@ router.patch('/:id/finalizar', async (req, res) => {
   try {
     const { id } = req.params;
 
+    const corridaExistente = await prisma.corrida.findUnique({ where: { id } });
+    if (!corridaExistente) {
+      return res.status(404).json({ erro: 'Corrida nao encontrada' });
+    }
+    if (req.user?.id !== corridaExistente.motoristaId && req.user?.id !== corridaExistente.passageiroId) {
+      return res.status(403).json({ erro: 'Acesso negado' });
+    }
+
     const corrida = await prisma.corrida.update({
       where: { id },
       data: { status: 'finalizada' }
@@ -325,6 +369,14 @@ router.put('/:id/avaliar', async (req, res) => {
     const nota = Number(avaliacao);
     if (!Number.isFinite(nota) || nota < 1 || nota > 5) {
       return res.status(400).json({ error: 'Avaliacao invalida' });
+    }
+
+    const corridaExistente = await prisma.corrida.findUnique({ where: { id } });
+    if (!corridaExistente) {
+      return res.status(404).json({ erro: 'Corrida nao encontrada' });
+    }
+    if (req.user?.id !== corridaExistente.passageiroId && req.user?.id !== corridaExistente.motoristaId) {
+      return res.status(403).json({ erro: 'Acesso negado' });
     }
 
     const corrida = await prisma.corrida.update({

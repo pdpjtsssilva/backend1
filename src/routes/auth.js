@@ -105,6 +105,10 @@ router.put('/atualizar/:id', async (req, res) => {
         const { id } = req.params;
         const { nome, email, telefone, documento, senha } = req.body || {};
 
+        if (!req.user || req.user.id !== id) {
+            return res.status(403).json({ erro: 'Acesso negado' });
+        }
+
         const usuario = await prisma.user.findUnique({ where: { id } });
         if (!usuario) {
             return res.status(404).json({ erro: 'Usuario nao encontrado' });

@@ -4,12 +4,21 @@ const router = express.Router();
 
 const prisma = require('../lib/prisma');
 
+const ensureMotoristaSelf = (req, res, userId) => {
+  if (!req.user || req.user.id !== userId || req.user.tipo !== 'motorista') {
+    res.status(403).json({ erro: 'Acesso negado' });
+    return false;
+  }
+  return true;
+};
+
 // Rotas legadas em /api/carros
 
 // Listar carros do motorista
 router.get('/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
+    if (!ensureMotoristaSelf(req, res, userId)) return;
     const carros = await prisma.carro.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' }
@@ -28,6 +37,7 @@ router.post('/', async (req, res) => {
     if (!userId || !marca || !modelo || !placa) {
       return res.status(400).json({ erro: 'Campos obrigatorios: userId, marca, modelo, placa' });
     }
+    if (!ensureMotoristaSelf(req, res, userId)) return;
 
     if (principal) {
       await prisma.carro.updateMany({ where: { userId }, data: { principal: false } });
@@ -62,6 +72,7 @@ router.patch('/:id', async (req, res) => {
 
     const carro = await prisma.carro.findUnique({ where: { id } });
     if (!carro) return res.status(404).json({ erro: 'Carro nao encontrado' });
+    if (!ensureMotoristaSelf(req, res, carro.userId)) return;
 
     if (principal) {
       await prisma.carro.updateMany({ where: { userId: carro.userId }, data: { principal: false } });
@@ -94,6 +105,10 @@ router.patch('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const carro = await prisma.carro.findUnique({ where: { id } });
+    if (!carro) return res.status(404).json({ erro: 'Carro nao encontrado' });
+    if (!ensureMotoristaSelf(req, res, carro.userId)) return;
+
     await prisma.carro.delete({ where: { id } });
     res.json({ ok: true });
   } catch (error) {

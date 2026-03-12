@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const path = require('path');
+const { requireAuth } = require('./middlewares/auth');
 
 // Ajuste para carregar .env apenas em desenvolvimento
 if (process.env.NODE_ENV !== 'production') {
@@ -23,6 +24,14 @@ const server = http.createServer(app);
 
 app.use(cors());
 app.use(express.json());
+
+// Protege rotas da API com JWT (exceto auth/admin/status)
+app.use('/api', (req, res, next) => {
+  if (req.path === '/auth/login' || req.path === '/auth/cadastro') return next();
+  if (req.path.startsWith('/admin')) return next();
+  if (req.path.startsWith('/status')) return next();
+  return requireAuth(req, res, next);
+});
 
 // Logs de Verificação (Aparecerão no console do Render para diagnóstico)
 console.log("--- Verificação de Ambiente ---");

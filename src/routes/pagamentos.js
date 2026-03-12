@@ -9,6 +9,14 @@ const stripe = stripeKey ? new Stripe(stripeKey, { apiVersion: '2023-10-16' }) :
 const stripeCurrency = process.env.STRIPE_DEFAULT_CURRENCY || 'brl';
 const COMISSAO_PADRAO = 0.2; // 20% da corrida retida como comissao da plataforma
 
+const ensureSelf = (req, res, userId) => {
+  if (!req.user || req.user.id !== userId) {
+    res.status(403).json({ erro: 'Acesso negado' });
+    return false;
+  }
+  return true;
+};
+
 const toCents = (valor) => Math.round(Number(valor || 0) * 100);
 
 async function ensureCarteira(userId) {
@@ -27,6 +35,10 @@ async function ensureCarteira(userId) {
 router.get('/cartoes/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
+    if (!ensureSelf(req, res, userId)) return;
+    if (req.user?.tipo !== 'passageiro') {
+      return res.status(403).json({ erro: 'Acesso negado' });
+    }
     const cartoes = await prisma.cartao.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' }
@@ -45,6 +57,7 @@ router.post('/cartoes', async (req, res) => {
     if (!userId || !numero || !nome || !validade) {
       return res.status(400).json({ erro: 'Dados incompletos' });
     }
+    if (!ensureSelf(req, res, userId)) return;
     const last4 = `${numero}`.slice(-4);
     const numeroMascarado = `**** **** **** ${last4}`;
     const cartao = await prisma.cartao.create({
@@ -68,6 +81,10 @@ router.patch('/cartoes/:id/principal', async (req, res) => {
   try {
     const { id } = req.params;
     const { userId } = req.body;
+    if (!ensureSelf(req, res, userId)) return;
+    const cartaoExistente = await prisma.cartao.findUnique({ where: { id } });
+    if (!cartaoExistente) return res.status(404).json({ erro: 'Cartao nao encontrado' });
+    if (cartaoExistente.userId !== userId) return res.status(403).json({ erro: 'Acesso negado' });
     await prisma.cartao.updateMany({ where: { userId }, data: { principal: false } });
     const cartao = await prisma.cartao.update({ where: { id }, data: { principal: true } });
     res.json(cartao);
@@ -80,6 +97,9 @@ router.patch('/cartoes/:id/principal', async (req, res) => {
 router.delete('/cartoes/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const cartaoExistente = await prisma.cartao.findUnique({ where: { id } });
+    if (!cartaoExistente) return res.status(404).json({ erro: 'Cartao nao encontrado' });
+    if (!ensureSelf(req, res, cartaoExistente.userId)) return;
     await prisma.cartao.delete({ where: { id } });
     res.json({ mensagem: 'Cartao removido com sucesso' });
   } catch (error) {
@@ -92,6 +112,7 @@ router.delete('/cartoes/:id', async (req, res) => {
 router.get('/carteira/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
+    if (!ensureSelf(req, res, userId)) return;
     const carteira = await ensureCarteira(userId);
     res.json(carteira);
   } catch (error) {
@@ -108,6 +129,7 @@ router.post('/carteira/adicionar', async (req, res) => {
     if (!userId || !valorNumero || valorNumero <= 0) {
       return res.status(400).json({ erro: 'Valor invalido' });
     }
+    if (!ensureSelf(req, res, userId)) return;
     if (metodoPagamento === 'carteira') {
       return res.status(400).json({ erro: 'Recarga com carteira nao faz sentido' });
     }
@@ -171,6 +193,7 @@ router.post('/pagar', async (req, res) => {
     if (!userId || !corridaId || !valorNumero || valorNumero <= 0) {
       return res.status(400).json({ erro: 'Dados invalidos' });
     }
+    if (!ensureSelf(req, res, userId)) return;
 
     // Garantir corrida existe
     const corrida = await prisma.corrida.findUnique({ where: { id: corridaId } });
@@ -341,6 +364,7 @@ router.get('/transacoes/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const { limit = 50 } = req.query;
+    if (!ensureSelf(req, res, userId)) return;
     const transacoes = await prisma.transacao.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },

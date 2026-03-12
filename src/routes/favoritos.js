@@ -9,6 +9,9 @@ const prisma = require('../lib/prisma');
 router.get('/usuario/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
+    if (!req.user || req.user.id !== userId) {
+      return res.status(403).json({ erro: 'Acesso negado' });
+    }
 
     const favoritos = await prisma.favorito.findMany({
       where: { userId },
@@ -31,6 +34,9 @@ router.post('/', async (req, res) => {
 
     if (!userId || !nome || !latitude || !longitude) {
       return res.status(400).json({ error: 'Dados incompletos' });
+    }
+    if (!req.user || req.user.id !== userId) {
+      return res.status(403).json({ erro: 'Acesso negado' });
     }
 
     const favorito = await prisma.favorito.create({
@@ -59,6 +65,14 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { nome, endereco, latitude, longitude, icone } = req.body;
 
+    const favoritoExistente = await prisma.favorito.findUnique({ where: { id } });
+    if (!favoritoExistente) {
+      return res.status(404).json({ error: 'Favorito nao encontrado' });
+    }
+    if (!req.user || req.user.id !== favoritoExistente.userId) {
+      return res.status(403).json({ erro: 'Acesso negado' });
+    }
+
     const favorito = await prisma.favorito.update({
       where: { id },
       data: {
@@ -84,6 +98,14 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
+    const favoritoExistente = await prisma.favorito.findUnique({ where: { id } });
+    if (!favoritoExistente) {
+      return res.status(404).json({ error: 'Favorito nao encontrado' });
+    }
+    if (!req.user || req.user.id !== favoritoExistente.userId) {
+      return res.status(403).json({ erro: 'Acesso negado' });
+    }
+
     await prisma.favorito.delete({
       where: { id }
     });
@@ -108,6 +130,9 @@ router.get('/:id', async (req, res) => {
 
     if (!favorito) {
       return res.status(404).json({ error: 'Favorito não encontrado' });
+    }
+    if (!req.user || req.user.id !== favorito.userId) {
+      return res.status(403).json({ erro: 'Acesso negado' });
     }
 
     res.json(favorito);

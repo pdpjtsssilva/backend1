@@ -12,6 +12,14 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }
 });
 
+const ensureMotoristaSelf = (req, res, userId) => {
+  if (!req.user || req.user.id !== userId || req.user.tipo !== 'motorista') {
+    res.status(403).json({ erro: 'Acesso negado' });
+    return false;
+  }
+  return true;
+};
+
 const cloudinaryEnabled = Boolean(
   process.env.CLOUDINARY_URL ||
   (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
@@ -88,6 +96,7 @@ const salvarArquivoCnh = async (file, userId, tipo) => {
 router.get('/:userId/carros', async (req, res) => {
   try {
     const { userId } = req.params;
+    if (!ensureMotoristaSelf(req, res, userId)) return;
     const carros = await prisma.carro.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' }
@@ -107,6 +116,7 @@ router.post('/:userId/carros', upload.fields([
 ]), async (req, res) => {
   try {
     const { userId } = req.params;
+    if (!ensureMotoristaSelf(req, res, userId)) return;
     const { marca, modelo, placa, cor, ano, seguro, inspecao, licenciamento, principal } = req.body;
     if (!marca || !modelo || !placa) {
       return res.status(400).json({ erro: 'Informe marca, modelo e placa' });
@@ -152,6 +162,7 @@ router.put('/:userId/carros/:carroId', upload.fields([
 ]), async (req, res) => {
   try {
     const { userId, carroId } = req.params;
+    if (!ensureMotoristaSelf(req, res, userId)) return;
     const { marca, modelo, placa, cor, ano, seguro, inspecao, licenciamento, principal, ativo } = req.body;
 
     const carro = await prisma.carro.findUnique({ where: { id: carroId } });
@@ -203,6 +214,7 @@ router.put('/:userId/carros/:carroId', upload.fields([
 router.patch('/:userId/carros/:carroId/principal', async (req, res) => {
   try {
     const { userId, carroId } = req.params;
+    if (!ensureMotoristaSelf(req, res, userId)) return;
 
     const carro = await prisma.carro.findUnique({ where: { id: carroId } });
     if (!carro || carro.userId !== userId) {
@@ -226,6 +238,7 @@ router.patch('/:userId/carros/:carroId/principal', async (req, res) => {
 router.delete('/:userId/carros/:carroId', async (req, res) => {
   try {
     const { userId, carroId } = req.params;
+    if (!ensureMotoristaSelf(req, res, userId)) return;
     const carro = await prisma.carro.findUnique({ where: { id: carroId } });
     if (!carro || carro.userId !== userId) {
       return res.status(404).json({ erro: 'Carro nao encontrado' });
@@ -246,6 +259,7 @@ router.post('/:userId/cnh', upload.fields([
 ]), async (req, res) => {
   try {
     const { userId } = req.params;
+    if (!ensureMotoristaSelf(req, res, userId)) return;
     const frenteUri = await salvarArquivoCnh(req.files?.cnhFrente?.[0], userId, 'frente');
     const versoUri = await salvarArquivoCnh(req.files?.cnhVerso?.[0], userId, 'verso');
 
